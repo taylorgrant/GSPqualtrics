@@ -65,7 +65,7 @@ server = function(input, output, session) {
   
   # Menu Options for UI -----------------------------------------------------
   
-  # 1. selecting a survey to possibly download # 
+  # 1. Select a survey to possibly load into environment
   output$surveySelect <- renderUI({
     selectInput("surveySelect", "Select a survey:",
                 c("", sids$name)
@@ -96,77 +96,60 @@ server = function(input, output, session) {
               ))
     })
     
+    # 4a. On load, pull in the survey blocks
     output$blockContents <- renderUI({
       selectInput("block_contents", "Survey Block",
                   choices = c(unique(toc$block), "RESET / ALL BLOCKS"))
     })
     
+    # 4b. On load, pull in the survey questionnaire
     output$tableContents <- renderUI({
-      selectInput("tableContents", "Question",
+      selectInput("table_contents", "Question",
                   c("", paste0("Q", toc$question_order, ": ", toc$question_text)))
     })
   })
   
+  # 5. Allow the Survey Block selection to filter the questionnaire 
   observe({
-    
+    # call helper to filter questions as necessary
     updated_toc <- toc_filter(toc, input$block_contents)
-    
+
     updateSelectInput(
       session = session, 
-      inputId = "tableContents",
+      inputId = "table_contents",
       choices = c("", updated_toc)
     )
   })
   
-  
-  # observe({
-  #   exists("toc")
-  #   output$tableContents <- renderUI({
-  #     selectInput("tableContents", "Question",
-  #                 c("", paste0("Q", toc$question_order, ": ", toc$question_text)))
-  #   })
-    # output$blockContents <- renderUI({
-    #   selectInput("blockContents", "Block",
-    #               unique(toc$block))
-    # })
-  # })
-    
-    
+  observeEvent(input$table_contents, {   
+    output$tab1 <- renderUI({
+      tab1_ui <- tabItem("gfk", h4("Quarterly GFK Survey Response"), value="test1",
+                         fluidRow(
+                           box(
+                             width = 8,
+                             renderTable(toc %>% 
+                                  filter(question_text == trimws(gsub(".*\\:", "", input$table_contents))))
+                             # highchartOutput("hcontainer", height = "650px")
+                           ),
+                           box(
+                             width = 3,
+                             title_side = "left",
+                             title = "About the GfK Data:"
+                             # htmlOutput("about")
+                           )
+                         ),
+                         fluidRow(
+                           box(
+                             width = 3,
+                             title_side = "left",
+                             title = "Download"
+                             # downloadButton("downloadPlot", "Download Plot")
+                           )
+                         )
+      )
 
-  
-  
-  
-  
-  
-  
-    # load_survey(sids[sids$name == input$surveySelect,]$id) # hold off on DL for now
-#     output$tab1 <- renderUI({
-#       tab1_ui <- tabItem("gfk", h4("Quarterly GFK Survey Response"), value="test1",
-#                          fluidRow(
-#                            box(
-#                              width = 8,
-#                              renderTable(head(svy[25:30, 48:56]))
-#                              # highchartOutput("hcontainer", height = "650px")
-#                            ),
-#                            box(
-#                              width = 3,
-#                              title_side = "left",
-#                              title = "About the GfK Data:"
-#                              # htmlOutput("about")
-#                            )
-#                          ),
-#                          fluidRow(
-#                            box(
-#                              width = 3,
-#                              title_side = "left",
-#                              title = "Download"
-#                              # downloadButton("downloadPlot", "Download Plot")
-#                            )
-#                          )
-#       )
-#       
-#     })
-# })
+    })
+})
   
   
   
