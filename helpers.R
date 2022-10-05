@@ -33,7 +33,8 @@ load_survey <- function(sid) {
   svy_q <<- qsurvey::questions(design_object = d) |>  
     dplyr::mutate(question_text = cleanFun(question_text), # strip html tags
                   question_text = gsub("[\r\n\t]", " ", question_text), # strip line breaks
-                  question_text = trimws(gsub("\\s+", " ", question_text))) |>  
+                  question_text = trimws(gsub("\\s+", " ", question_text)),
+                  question_text = str_replace_all(question_text, "&quot;", "'")) |>  
     dplyr::filter(question_type != "DB") |> 
     dplyr::as_tibble()
   # get survey choices for each question
@@ -43,7 +44,34 @@ load_survey <- function(sid) {
                   choice_text = trimws(gsub("\\s+", " ", choice_text))) %>%
     dplyr::as_tibble()
   
+  # pull blocks and questions within each
+  blockbuild <- data.table::rbindlist(d$blocks) |>  
+    unnest(elements) |>  
+    unnest(elements) |> 
+    filter(!elements %in% c("Question", "PageBreak")) |>
+    mutate(description = trimws(description)) |>
+    rename(block = description, question_id = elements)
+  
   # keep a tidy TOC of distinct questions 
   toc <<- svy_q |> 
-    dplyr::distinct(question_id, .keep_all = TRUE)
+    dplyr::distinct(question_id, .keep_all = TRUE) |> 
+    left_join(blockbuild) |>  
+    relocate(block, .before = "question_order")
+  
 }
+
+# filter down the TOC questions by Block; and allow for RESET
+toc_filter <- function(tbl, blck) {
+  
+  if (any(toc$block == blck)) {
+    tbl %>% 
+      filter(block %in% blck) %>% 
+      mutate(newtoc = paste0("Q", question_order, ": ", question_text)) %>%
+      pull(newtoc)
+  } else
+    tbl %>% 
+    mutate(newtoc = paste0("Q", question_order, ": ", question_text)) %>%
+    pull(newtoc)
+    
+}
+
