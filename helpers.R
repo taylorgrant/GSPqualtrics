@@ -65,13 +65,13 @@ toc_filter <- function(tbl, blck) {
   
   if (any(toc$block == blck)) {
     tbl %>% 
-      filter(block %in% blck) %>% 
-      mutate(newtoc = paste0("Q", question_order, ": ", question_text)) %>%
-      pull(newtoc)
+      filter(block %in% blck)  %>%
+      mutate(newtoc = paste0("Q", question_order, ": ", question_text)) %>% 
+      pull()
   } else
     tbl %>% 
-    mutate(newtoc = paste0("Q", question_order, ": ", question_text)) %>%
-    pull(newtoc)
+      mutate(newtoc = paste0("Q", question_order, ": ", question_text)) %>% 
+      pull()
     
 }
 
