@@ -25,17 +25,11 @@ sidebar <- dashboardSidebar(
     id = "tabs",
     convertMenuItem(menuItem("Qualtrics Data", tabName = "gfk", icon = icon("square-poll-vertical"), selected=T,
                              menuItem("Available Surveys", uiOutput("surveySelect")), 
-                             uiOutput("importSurvey"),
                              br(),
-                             menuItem("Question List:", uiOutput("tableContents"))
-    ),
-    "gfk"
-    ),
-    convertMenuItem(menuItem("Sales Data by Make", tabName = "sales", icon = icon("dashboard"),selected=F
-    ), "sales"),
-    convertMenuItem(menuItem("Monthly Sales by Make & Model", tabName = "monthlysales", icon = icon("dashboard"),
-                             selected=F
-    ), "monthlysales")
+                             menuItem("Block list:", uiOutput("blockContents")),
+                             menuItem("Question List:", uiOutput("tableContents")))
+                    , "gfk"
+    )
   )
 )
 
@@ -52,9 +46,7 @@ body <- dashboardBody(
   # tags$head(tags$link(rel = "shortcut icon", href = "favicon.ico")),
   tabItems(
     # conditionally render the output using inputs (see renderUI below)
-    tabItem("gfk", uiOutput("tab1")),
-    tabItem("sales", uiOutput("tab2")),
-    tabItem("monthlysales", uiOutput("tab3"))
+    tabItem("gfk", uiOutput("tab1"))
   )
 )
 
@@ -64,65 +56,117 @@ ui = dashboardPage(header, sidebar, body, skin = "black")
 # SERVER SIDE -------------------------------------------------------------
 server = function(input, output, session) { 
   
-
+  # validation message to give people idea of where to go
+  output$tab1 <- renderUI({
+    validate(
+      need(input$surveySelect != "", "To begin, please select a survey from the dropdown menu at left")
+    )
+  })
+  
   # Menu Options for UI -----------------------------------------------------
+  
+  # 1. selecting a survey to possibly download # 
   output$surveySelect <- renderUI({
     selectInput("surveySelect", "Select a survey:",
                 c("", sids$name)
     )
   })
   
-  output$importSurvey <- renderUI({
-    if (input$surveySelect == '') return() 
-    actionButton("importSurvey", "Import Survey", icon = icon("upload"),
-                 width = "150px")
+  # 2. Import Survey button to trigger the import from API
+  observeEvent(input$surveySelect, {   
+    output$tab1 <- renderUI({
+      tab1_ui <- tabItem("gfk")
+      if (input$surveySelect == '') return() 
+      actionButton("importSurvey", "Import Survey", icon = icon("upload"),
+                   width = "200px")
+    })
+  })
+  
+  # 3. Importing survey brings summary data to make sure proper survey loaded 
+  observeEvent(input$importSurvey, {
+    # load the survey here
+    # load_survey(sids[sids$name == input$surveySelect,]$id)
+    output$tab1 <- renderUI({
+      tabItem("gfk", h4("Imported Survey"), #value = "test1",
+              fluidRow(
+                box(width = 5,
+                    renderTable(data.frame(Metadata = c("Name", "ID", "Created", "Responses", "Questions", "Blocks"),
+                                           Response = c(d$name, d$id, d$creationDate, d$responseCounts$auditable, 
+                                                   length(d$questions), length(d$blocks)))))
+              ))
+    })
+    
+    output$blockContents <- renderUI({
+      selectInput("block_contents", "Survey Block",
+                  choices = c(unique(toc$block), "RESET / ALL BLOCKS"))
+    })
+    
+    output$tableContents <- renderUI({
+      selectInput("tableContents", "Question",
+                  c("", paste0("Q", toc$question_order, ": ", toc$question_text)))
+    })
   })
   
   observe({
-    exists("toc")
-  output$tableContents <- renderUI({
-    selectInput("tableContents", "Question",
-                c("", paste0(toc$export_name, " ", toc$question_text)))
-    })
-  })
-  output$tab1 <- renderUI({
-    # validation message rather than the standard error
-    validate(
-      need(input$surveySelect != "", "To begin, please select a survey from the dropdown menu at left")
+    
+    updated_toc <- toc_filter(toc, input$block_contents)
+    
+    updateSelectInput(
+      session = session, 
+      inputId = "tableContents",
+      choices = c("", updated_toc)
     )
   })
   
-  observeEvent(input$importSurvey, {
+  
+  # observe({
+  #   exists("toc")
+  #   output$tableContents <- renderUI({
+  #     selectInput("tableContents", "Question",
+  #                 c("", paste0("Q", toc$question_order, ": ", toc$question_text)))
+  #   })
+    # output$blockContents <- renderUI({
+    #   selectInput("blockContents", "Block",
+    #               unique(toc$block))
+    # })
+  # })
+    
+    
+
+  
+  
+  
+  
+  
+  
     # load_survey(sids[sids$name == input$surveySelect,]$id) # hold off on DL for now
-    output$tab1 <- renderUI({
-      # validation message rather than the standard error
-      validate(need(input$surveySelect != "", "Please select a survey"))
-      tab1_ui <- tabItem("gfk", h4("Quarterly GFK Survey Response"), value="test1",
-                         fluidRow(
-                           box(
-                             width = 8,
-                             renderTable(head(svy[25:30, 48:56]))
-                             # highchartOutput("hcontainer", height = "650px")
-                           ),
-                           box(
-                             width = 3,
-                             title_side = "left",
-                             title = "About the GfK Data:"
-                             # htmlOutput("about")
-                           )
-                         ),
-                         fluidRow(
-                           box(
-                             width = 3,
-                             title_side = "left",
-                             title = "Download"
-                             # downloadButton("downloadPlot", "Download Plot")
-                           )
-                         )
-      )
-      
-    })
-  })
+#     output$tab1 <- renderUI({
+#       tab1_ui <- tabItem("gfk", h4("Quarterly GFK Survey Response"), value="test1",
+#                          fluidRow(
+#                            box(
+#                              width = 8,
+#                              renderTable(head(svy[25:30, 48:56]))
+#                              # highchartOutput("hcontainer", height = "650px")
+#                            ),
+#                            box(
+#                              width = 3,
+#                              title_side = "left",
+#                              title = "About the GfK Data:"
+#                              # htmlOutput("about")
+#                            )
+#                          ),
+#                          fluidRow(
+#                            box(
+#                              width = 3,
+#                              title_side = "left",
+#                              title = "Download"
+#                              # downloadButton("downloadPlot", "Download Plot")
+#                            )
+#                          )
+#       )
+#       
+#     })
+# })
   
   
   
