@@ -179,7 +179,7 @@ server = function(input, output, session) {
     },
     content = function(file){
       req(question_summary(input$table_contents)$p1)
-      showtext_opts(dpi = 300)
+      # showtext_opts(dpi = 300)
       ggsave(file, plot = question_summary(input$table_contents)$p1, device = 'png', width = 6.8, height = 6.3, unit = "in")
     }
   )
@@ -190,7 +190,7 @@ server = function(input, output, session) {
     },
     content = function(file){
       req(question_summary(input$table_contents)$p1_flip)
-      showtext_opts(dpi = 300)
+      # showtext_opts(dpi = 300)
       ggsave(file, plot = question_summary(input$table_contents)$p1_flip, device = 'png', width = 6.8, height = 6.3, unit = "in")
     }
   )
