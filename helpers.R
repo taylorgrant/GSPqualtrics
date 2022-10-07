@@ -58,7 +58,7 @@ load_survey <- function(sid) {
     left_join(blockbuild) |>  
     relocate(block, .before = "question_order")
   
-  # add in age group and cohort to the toc
+  # add age group and cohort options to the toc
   cohort_generation <- function(tbl) {
     if (any(toc$question_text == "How old are you? Please enter your current age below.")) {
       v1 <- tbl |> 
@@ -79,9 +79,6 @@ load_survey <- function(sid) {
   }
   toc <<- rbind(toc, cohort_generation(toc)) |> 
     arrange(question_order)
-  
-  
-
 }
 
 # filter down the TOC questions by Block; and allow for RESET
@@ -112,7 +109,7 @@ question_summary <- function(qid) {
   # based on question_type, run through summary function # 
   if (meta$question_type == "MC") {
     out <- multichoice(qid)
-  } else if ((meta$question_type == "TE") & str_detect(meta$question_text, "current age")) {
+  } else if (meta$question_type == "TE_AGE") {
     out <- textage(qid)
   } else if (meta$question_type == "RO") {
     out <- rankorder(qid)
