@@ -158,6 +158,7 @@ slider <- function(q) {
 
 # Matrix (Matrix)
 matrix_q <- function(q) {
+  meta <- toc %>% filter(question_id == q)
   # pull colmap 
   matrix_map <- colmap %>% 
     filter(str_detect(ImportId, glue::glue("{q}_"))) %>% 
@@ -182,7 +183,9 @@ matrix_q <- function(q) {
            value = factor(value, levels = dput(qchoice$choice_text))) %>%
     count(choice_text, value) %>% 
     group_by(choice_text) %>% 
-    mutate(frac = n/resp_count) 
+    mutate(frac = n/resp_count)
+  
+  out <- matrixQ_barplot(tmp, meta$question_text, resp_count)
 }
 
 # Pick Group Rank (PGR)
