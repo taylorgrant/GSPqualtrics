@@ -117,3 +117,58 @@ rankorderQ_barplot <- function(dat, title, nsize) {
   
   data_plot <- list(data = pdat, p1 = p1, p1_flip = p1_flip)
 }
+
+matrixQ_barplot <- function(dat, title, nsize) {
+  # add a palette
+  pal_choice <- function(tbl) {
+    if (length(unique(tbl$value)) == 2) {
+      c("#fafa6e", "#2a4858")
+    } else if (length(unique(tbl$value)) == 3) {
+      c("#fafa6e","#23aa8f","#2a4858")
+    } else if (length(unique(tbl$value)) == 4) {
+      c("#fafa6e","#64c987","#00898a","#2a4858")
+    } else {
+      c("#fafa6e","#86d780","#23aa8f","#007882", "#2a4858")
+    }
+  }
+  pal <- pal_choice(dat)
+  add_title_break <- function(x) gsub("(.{45,}?)\\s", "\\1\n", x)
+  
+  # check to see if matrix question is statement comparison
+  if (any(str_detect(dat$choice_text, "[A-Za-z]:[A-Za-z]"))) {
+    
+    add_statement_break <- function(x) gsub("(.{25,}?)\\s", "\\1\n", x)
+    
+    # add line breaks to statement and created grouped id for plot
+    dat <- separate(dat, choice_text, 
+                    into = c("statement_a", "statement_b"), sep = ":") %>% 
+      mutate(statement_a = add_statement_break(statement_a),
+             statement_b = add_statement_break(statement_b)) %>%
+      group_by(value) %>%
+      mutate(id = cumsum(!duplicated(statement_a)),
+             txtcol = ifelse(as.numeric(as.character(value)) > 2, "white", "black"))
+    
+    # line break for the title
+    ptitle <- ifelse(str_count(title, fixed(' ')) > 7, 
+                     add_title_break(title), title)
+    
+    p1 <- ggplot(dat, aes(x = frac, y = reorder(statement_a, id),
+                    fill = value)) +
+      geom_bar(stat = "identity", 
+               position = ggplot2::position_stack(reverse = TRUE)) +
+      scale_x_continuous(labels = scales::percent) +
+      scale_fill_manual(values = pal) +
+    guides(y.sec = ggh4x::guide_axis_manual(
+      breaks = dat$id,
+      labels = dat$statement_b)) +
+      geom_text(aes(x = frac, y = statement_a,
+                    label = scales::percent(frac, accuracy = 1)),
+                col = dat$txtcol,
+                position = position_stack(vjust = .5, reverse = TRUE)) +
+      labs(x = NULL, y= NULL,
+           title = ptitle,
+           caption = glue::glue("Source: GS&P {d$name}\nN-size: {nsize} respondents")) +
+      theme(legend.position = "none")
+  }
+  return(p1)
+}
