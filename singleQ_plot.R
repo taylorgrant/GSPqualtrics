@@ -137,10 +137,10 @@ matrixQ_barplot <- function(dat, title, nsize) {
       }
     }
     pal <- pal_choice(dat)
-    add_statement_break <- function(x) gsub("(.{25,}?)\\s", "\\1\n", x)
+    add_statement_break <- function(x) gsub("(.{20,}?)\\s", "\\1\n", x)
     
     # add line breaks to statement and created grouped id for plot
-    dat <- separate(dat, choice_text, 
+    pdat <- separate(dat, choice_text, 
                     into = c("statement_a", "statement_b"), sep = ":") %>% 
       mutate(statement_a = add_statement_break(statement_a),
              statement_b = add_statement_break(statement_b)) %>%
@@ -152,23 +152,24 @@ matrixQ_barplot <- function(dat, title, nsize) {
     ptitle <- ifelse(str_count(title, fixed(' ')) > 7, 
                      add_title_break(title), title)
     
-    p1 <- ggplot(dat, aes(x = frac, y = reorder(statement_a, id),
+    p1 <- ggplot(pdat, aes(x = frac, y = reorder(statement_a, id),
                     fill = value)) +
       geom_bar(stat = "identity", 
                position = ggplot2::position_stack(reverse = TRUE)) +
       scale_x_continuous(labels = scales::percent) +
       scale_fill_manual(values = pal) +
     guides(y.sec = ggh4x::guide_axis_manual(
-      breaks = dat$id,
-      labels = dat$statement_b)) +
+      breaks = pdat$id,
+      labels = pdat$statement_b)) +
       geom_text(aes(x = frac, y = statement_a,
                     label = scales::percent(frac, accuracy = 1)),
-                col = dat$txtcol,
+                col = pdat$txtcol,
                 position = position_stack(vjust = .5, reverse = TRUE)) +
       labs(x = NULL, y= NULL,
            title = ptitle,
            caption = glue::glue("Source: GS&P {d$name}\nN-size: {nsize} respondents")) +
       theme(legend.position = "none")
   }
-  return(p1)
+  
+  data_plot <- list(data = pdat, p1 = p1)
 }
