@@ -14,7 +14,7 @@ convertMenuItem <- function(mi,tabName) {
 # this is putting data into the global environment upon download from the API
 # design; colmap; survey questions; survey choices; and survey response data
 load_survey <- function(sid) {
-  pacman::p_load(tidyverse, here, janitor, glue, qsurvey, qualtRics)
+  # pacman::p_load(tidyverse, here, janitor, glue, qsurvey, qualtRics)
   # pull survey design (design object)
   d <<- qsurvey::design(id = sid)
   # load survey 
@@ -63,15 +63,46 @@ load_survey <- function(sid) {
 # filter down the TOC questions by Block; and allow for RESET
 toc_filter <- function(tbl, blck) {
   
-  if (any(toc$block == blck)) {
-    tbl %>% 
-      filter(block %in% blck)  %>%
-      mutate(newtoc = paste0("Q", question_order, ": ", question_text)) %>% 
-      pull()
+  if (any(tbl$block == blck)) {
+    tmp <- tbl |>  
+      filter(block %in% blck)  |>  
+      mutate(newtoc = paste0("Q", question_order, ": ", question_text))
+    # now grab newtoc and set names
+    tmptoc <- tmp$question_id |> 
+      set_names(nm = tmp$newtoc)
+
   } else
-    tbl %>% 
-      mutate(newtoc = paste0("Q", question_order, ": ", question_text)) %>% 
-      pull()
-    
+    tmp <- tbl |>  
+      mutate(newtoc = paste0("Q", question_order, ": ", question_text))  
+  # now grab newtoc and set names
+  tmptoc <- tmp$question_id |> 
+    set_names(nm = tmp$newtoc)
 }
+
+
+# SINGLE QUESTION SUMMARY  ------------------------------------------------
+
+question_summary <- function(qid) {
+  meta <- toc %>% filter(question_id == qid)
+  
+  # based on question_type, run through summary function # 
+  if (meta$question_type == "MC") {
+    out <- multichoice(qid)
+  } else if ((meta$question_type == "TE") & str_detect(meta$question_text, "current age")) {
+    out <- textage(qid)
+  } else if (meta$question_type == "RO") {
+    out <- rankorder(qid)
+  } else if (meta$question_type == "Slider") {
+    out <- slider(qid)
+  } else if (meta$question_type == "Matrix") {
+    out <- matrix_q(qid)
+  } else if (meta$question_type == "PGR") {
+    out <- pickgrouprank(qid)
+  } else if (meta$question_type == "DD") {
+    out <- drilldown(qid)
+  } 
+  return(out)
+}
+
+
 
