@@ -22,7 +22,7 @@ source('/srv/shiny-server/qualtrics-viz/singleQ_plot.R')
 header <- dashboardHeader(title = "Qualtrics Visualizer")
 
 sidebar <- dashboardSidebar(
-  width = 350,
+  width = 325,
   sidebarMenu(
     id = "tabs",
     convertMenuItem(menuItem("Qualtrics Data", tabName = "gfk", icon = icon("square-poll-vertical"), selected=T,
@@ -49,7 +49,7 @@ body <- dashboardBody(
   tabItems(
     # conditionally render the output using inputs (see renderUI below)
     tabItem("gfk", uiOutput("tab1"),
-            shinysky::busyIndicator(text = 'Please wait...', wait = 150))
+            shinysky::busyIndicator(text = 'Please wait...', wait = 1500))
   )
 )
 
@@ -130,11 +130,19 @@ server = function(input, output, session) {
   
   # Render in the main dashboard
   observeEvent(input$table_contents, {
+    
     output$tab1 <- renderUI({
       tab1_ui <- tabItem("gfk", h4("Survey Results"), value="test1",
                          fluidRow(
                            box(
                              width = 5,
+                             
+                             validate(
+                               need(input$table_contents != "", "Plesae select a question from the dropdown...")
+                             ),
+                             validate(
+                               need(toc[toc$question_id == input$table_contents,]$question_type != "TE", "This app doesn't visualize text open-ends yet...")
+                             ),
                              renderPlot(question_summary(input$table_contents)$p1)
                            ),
                            box(
