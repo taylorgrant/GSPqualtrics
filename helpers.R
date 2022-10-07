@@ -53,11 +53,35 @@ load_survey <- function(sid) {
     rename(block = description, question_id = elements)
   
   # keep a tidy TOC of distinct questions 
-  toc <<- svy_q |> 
+  toc <- svy_q |> 
     dplyr::distinct(question_id, .keep_all = TRUE) |> 
     left_join(blockbuild) |>  
     relocate(block, .before = "question_order")
   
+  # add in age group and cohort to the toc
+  cohort_generation <- function(tbl) {
+    if (any(toc$question_text == "How old are you? Please enter your current age below.")) {
+      v1 <- tbl |> 
+        filter(question_text == "How old are you? Please enter your current age below.") |>
+        mutate(question_id = paste0(question_id, "a"),
+               question_type = "TE_AGE",
+               question_text = "Respondent breakdown by age cohort")
+      
+      v2 <- tbl |> 
+        filter(question_text == "How old are you? Please enter your current age below.") |>
+        mutate(question_id = paste0(question_id, "b"),
+               question_type = "TE_AGE",
+               question_text = "Respondent breakdown by generation")
+      
+      age_add <- bind_rows(v1, v2)
+    } 
+                                  
+  }
+  toc <<- rbind(toc, cohort_generation(toc)) |> 
+    arrange(question_order)
+  
+  
+
 }
 
 # filter down the TOC questions by Block; and allow for RESET
