@@ -87,12 +87,13 @@ server = function(input, output, session) {
   
   # 3. Importing survey brings summary data to make sure proper survey loaded 
   observeEvent(input$importSurvey, {
-    # load the survey on button push
-    # load_survey(sids[sids$name == input$surveySelect,]$id)
+    # 
+    load_survey(sids[sids$name == input$surveySelect,]$id) # survey load on button push
+    # 
     output$tab1 <- renderUI({
       tabItem("gfk", h4("Imported Survey"), #value = "test1",
               fluidRow(
-                box(width = 5,
+                box(width = 4,
                     renderTable(data.frame(Metadata = c("Name", "ID", "Created", "Responses", "Questions", "Blocks"),
                                            Response = c(d$name, d$id, d$creationDate, d$responseCounts$auditable,
                                                    length(d$questions), length(d$blocks))))
@@ -103,7 +104,7 @@ server = function(input, output, session) {
     # 4a. On load, pull in the survey blocks
     output$blockContents <- renderUI({
       selectInput("block_contents", "Survey Block",
-                  choices = c("", unique(toc$block), "RESET / ALL BLOCKS"))
+                  choices = c(unique(toc$block), "RESET / ALL BLOCKS"))
     })
 
   #   # 4b. On load, pull in the survey questionnaire
@@ -135,7 +136,7 @@ server = function(input, output, session) {
       tab1_ui <- tabItem("gfk", h4("Survey Results"), value="test1",
                          fluidRow(
                            box(
-                             width = 5,
+                             width = 6,
                              
                              validate(
                                need(input$table_contents != "", "Plesae select a question from the dropdown...")
@@ -146,22 +147,23 @@ server = function(input, output, session) {
                              renderPlot(question_summary(input$table_contents)$p1)
                            ),
                            box(
-                             width = 3,
+                             width = 2,
                              title_side = "left",
                              title = "Download",
+                             radioButtons("radio1", "Download Size", list("Half Slide","Full Slide"), inline = TRUE, selected = "Half Slide"),
                              downloadButton("downloadPlot1", "Download Plot")
                            )
                          ),
                          fluidRow(
                            box(
-                             width = 5,
+                             width = 6,
                              renderPlot(question_summary(input$table_contents)$p1_flip)
-                             # renderTable(question_summary(input$table_contents)$data)
                            ),
                            box(
-                             width = 3,
+                             width = 2,
                              title_side = "left",
                              title = "Download",
+                             radioButtons("radio2", "Download Size", list("Half Slide","Full Slide"), inline = TRUE, selected = "Half Slide"),
                              downloadButton("downloadPlot2", "Download Plot")
                            )
                          )
@@ -174,10 +176,10 @@ server = function(input, output, session) {
   output$downloadPlot1 <- downloadHandler(
     filename = function(){
       paste0(d$name, "-Q", toc[toc$question_id == input$table_contents,]$question_order, ".png")
-      # paste0(d$name, "-Q", toc[toc$input$table_contents,]$question_order, ".png")
     },
     content = function(file){
       req(question_summary(input$table_contents)$p1)
+      showtext_opts(dpi = 300)
       ggsave(file, plot = question_summary(input$table_contents)$p1, device = 'png', width = 6.8, height = 6.3, unit = "in")
     }
   )
@@ -187,7 +189,8 @@ server = function(input, output, session) {
       paste0(d$name, "-Q", toc[toc$question_id == input$table_contents,]$question_order, "-flip.png")
     },
     content = function(file){
-      # req(out$p1)
+      req(question_summary(input$table_contents)$p1_flip)
+      showtext_opts(dpi = 300)
       ggsave(file, plot = question_summary(input$table_contents)$p1_flip, device = 'png', width = 6.8, height = 6.3, unit = "in")
     }
   )
