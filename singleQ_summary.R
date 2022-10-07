@@ -35,10 +35,10 @@ multichoice <- function(q) {
 
 # Text (only for Age question - TE)
 textage <- function(q) {
-  meta <- toc %>% filter(question_id == q)
   
+  meta <- toc %>% filter(question_id == q)
   qpull <- svy_q %>%
-    filter(question_id == q)
+    filter(question_id == str_replace_all(q, "a|b", ""))
   
   # pull columns from survey data
   tmp <- svy %>% 
@@ -54,46 +54,43 @@ textage <- function(q) {
     mutate(value = as.numeric(value)) %>%
     mutate(frac = n/resp_count)
   
-  age_groups <- tmp %>% 
-    mutate(group = case_when(value <= 24 ~ "18-24",
-                             value > 24 & value <= 34 ~ "25-34",
-                             value > 34 & value <= 44 ~ "35-44",
-                             value > 44 & value <= 54 ~ "45-54",
-                             value > 54 & value <= 64 ~ "55-64",
-                             value > 64 ~ "65+")) %>% 
-    group_by(group) %>% 
-    summarise(n = sum(n)) %>% 
-    mutate(frac = n/resp_count,
-           group = factor(group, levels = c("18-24", "25-34", "35-44", 
-                                            "45-54", "55-64", "65+"))) %>% 
-    rename(value = group) %>%
-    arrange(value)
-  
-  age_cohorts <- tmp %>% 
-    mutate(yob = 2022 - value) %>% 
-    mutate (gen = case_when (yob < 2013 & yob > 1996 ~ 'Gen Z',
-                             yob < 1997 & yob > 1980 ~ 'Millennial',
-                             yob < 1981 & yob > 1964 ~ 'Gen X',
-                             yob < 1965 & yob > 1945 ~ 'Boomers',
-                             yob < 1946 & yob > 1927 ~ 'Silent',
-                             yob < 1928 ~ 'Greatest',
-                             yob > 2012 ~ 'Post-Z')) %>% 
-    group_by(gen) %>% 
-    summarise(n = sum(n)) %>% 
-    mutate(frac = n/resp_count,
-           gen = factor(gen, levels = c("Post-Z","Gen Z", "Millennial", "Gen X", "Boomers",
-                                        "Silent", "Greatest"))) %>% 
-    rename(value = gen) %>% 
-    arrange(value)
-  
-  tmp <- list(age_groups = age_groups, 
-              age_cohorts = age_cohorts)
-  # graph and output
-  out1 <- singleQ_barplot(tmp$age_groups, "Respondent Age - Age Groups", resp_count)
-  out2 <- singleQ_barplot(tmp$age_cohorts, "Respondent Age - Generational Cohorts", resp_count)
-  out <- list(group_data = out1$data, cohort_data = out2$data, 
-              p1 = out1$p1, p1_flip = out1$p1_flip, 
-              p2 = out2$p1, p2_flip = out2$p1_flip)
+  if (meta$question_text == "Respondent breakdown by age cohort") {
+    tmp <- tmp %>% 
+      mutate(group = case_when(value <= 24 ~ "18-24",
+                               value > 24 & value <= 34 ~ "25-34",
+                               value > 34 & value <= 44 ~ "35-44",
+                               value > 44 & value <= 54 ~ "45-54",
+                               value > 54 & value <= 64 ~ "55-64",
+                               value > 64 ~ "65+")) %>% 
+      group_by(group) %>% 
+      summarise(n = sum(n)) %>% 
+      mutate(frac = n/resp_count,
+             group = factor(group, levels = c("18-24", "25-34", "35-44", 
+                                              "45-54", "55-64", "65+"))) %>% 
+      rename(value = group) %>%
+      arrange(value)
+    
+    out <- singleQ_barplot(tmp, meta$question_text, resp_count)
+  } else {
+    tmp <- tmp %>% 
+      mutate(yob = 2022 - value) %>% 
+      mutate (gen = case_when (yob < 2013 & yob > 1996 ~ 'Gen Z',
+                               yob < 1997 & yob > 1980 ~ 'Millennial',
+                               yob < 1981 & yob > 1964 ~ 'Gen X',
+                               yob < 1965 & yob > 1945 ~ 'Boomers',
+                               yob < 1946 & yob > 1927 ~ 'Silent',
+                               yob < 1928 ~ 'Greatest',
+                               yob > 2012 ~ 'Post-Z')) %>% 
+      group_by(gen) %>% 
+      summarise(n = sum(n)) %>% 
+      mutate(frac = n/resp_count,
+             gen = factor(gen, levels = c("Post-Z","Gen Z", "Millennial", "Gen X", "Boomers",
+                                          "Silent", "Greatest"))) %>% 
+      rename(value = gen) %>% 
+      arrange(value)
+    
+    out <- singleQ_barplot(tmp, meta$question_text, resp_count)
+  }
 }
 
 # Rank Order (RO)
