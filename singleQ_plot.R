@@ -119,24 +119,24 @@ rankorderQ_barplot <- function(dat, title, nsize) {
 }
 
 matrixQ_barplot <- function(dat, title, nsize) {
-  # add a palette
-  pal_choice <- function(tbl) {
-    if (length(unique(tbl$value)) == 2) {
-      c("#fafa6e", "#2a4858")
-    } else if (length(unique(tbl$value)) == 3) {
-      c("#fafa6e","#23aa8f","#2a4858")
-    } else if (length(unique(tbl$value)) == 4) {
-      c("#fafa6e","#64c987","#00898a","#2a4858")
-    } else {
-      c("#fafa6e","#86d780","#23aa8f","#007882", "#2a4858")
-    }
-  }
-  pal <- pal_choice(dat)
+  
   add_title_break <- function(x) gsub("(.{45,}?)\\s", "\\1\n", x)
   
   # check to see if matrix question is statement comparison
   if (any(str_detect(dat$choice_text, "[A-Za-z]:[A-Za-z]"))) {
-    
+    # add a palette
+    pal_choice <- function(tbl) {
+      if (length(unique(tbl$value)) == 2) {
+        c("#fafa6e", "#2a4858")
+      } else if (length(unique(tbl$value)) == 3) {
+        c("#fafa6e","#23aa8f","#2a4858")
+      } else if (length(unique(tbl$value)) == 4) {
+        c("#fafa6e","#64c987","#00898a","#2a4858")
+      } else {
+        c("#fafa6e","#86d780","#23aa8f","#007882", "#2a4858")
+      }
+    }
+    pal <- pal_choice(dat)
     add_statement_break <- function(x) gsub("(.{25,}?)\\s", "\\1\n", x)
     
     # add line breaks to statement and created grouped id for plot
