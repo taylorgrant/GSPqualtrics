@@ -1,20 +1,18 @@
 # Shiny App - Qualtrics Visual and Table #
 
-pacman::p_load(tidyverse, janitor, here, glue, qsurvey, qualtRics, shinydashboard)
+pacman::p_load(tidyverse, janitor, here, glue, qsurvey, 
+               qualtRics, shinydashboard, shinyWidgets)
 
 # temporary - will have this on a cron job in the rstudio side # 
 # sids <- qualtRics::all_surveys() %>%
 #   dplyr::mutate(creationDate = as.Date(creationDate)) %>%
 #   dplyr::arrange(desc(creationDate))
 # saveRDS(sids, "/srv/shiny-server/qualtrics-viz/data/qualtrics_sids.rds")
-source("theme_xf.R")
+
+
 # load Qualtrics Survey IDs
 sids <- readRDS("/srv/shiny-server/qualtrics-viz/data/qualtrics_sids.rds")
 
-# load helpers
-source('/srv/shiny-server/qualtrics-viz/helpers.R')
-source('/srv/shiny-server/qualtrics-viz/singleQ_summary.R')
-source('/srv/shiny-server/qualtrics-viz/singleQ_plot.R')
 
 # SHINY APP  --------------------------------------------------------------
 
@@ -25,12 +23,32 @@ sidebar <- dashboardSidebar(
   width = 325,
   sidebarMenu(
     id = "tabs",
-    convertMenuItem(menuItem("Qualtrics Data", tabName = "gfk", icon = icon("square-poll-vertical"), selected=T,
-                             menuItem("Available Surveys", uiOutput("surveySelect")), 
-                             br(),
-                             menuItem("Block list:", uiOutput("blockContents")),
-                             menuItem("Question List:", uiOutput("tableContents")))
-                    , "gfk"
+    convertMenuItem(
+      menuItem("Qualtrics Data", 
+               tabName = "qualsurvey", 
+               icon = icon("square-poll-vertical"), 
+               selected=T,
+               menuItem("Available Surveys", uiOutput("surveySelect")),
+               uiOutput("importSurvey", 
+                        align = "center"),
+               br(),
+               menuItem("Block list:", uiOutput("blockContents")),
+               menuItem("Question List:", uiOutput("tableContents")),
+               menuItem("Color", spectrumInput(
+                 inputId = "my_color",
+                 label = "Pick a color:",
+                 selected = "#0072B2",
+                 flat = TRUE,
+                 choices = list(
+                   list('black', 'white', 'blanchedalmond', 'steelblue', 'forestgreen'),
+                   as.list(scales::brewer_pal(palette = "Blues")(9)),
+                   as.list(scales::brewer_pal(palette = "Greens")(9)),
+                   as.list(scales::brewer_pal(palette = "Spectral")(11)),
+                   as.list(scales::brewer_pal(palette = "Dark2")(8))
+                 ),
+                 options = list(`toggle-palette-more-text` = "Show more")
+               ))), 
+      "qualsurvey"
     )
   )
 )
@@ -48,7 +66,7 @@ body <- dashboardBody(
   # tags$head(tags$link(rel = "shortcut icon", href = "favicon.ico")),
   tabItems(
     # conditionally render the output using inputs (see renderUI below)
-    tabItem("gfk", uiOutput("tab1"),
+    tabItem("qualsurvey", uiOutput("tab1"),
             shinysky::busyIndicator(text = 'Please wait...', wait = 1500))
   )
 )
@@ -77,21 +95,25 @@ server = function(input, output, session) {
   
   # 2. Import Survey button to trigger the import from API
   observeEvent(input$surveySelect, {
-    output$tab1 <- renderUI({
-      tab1_ui <- tabItem("gfk")
+    output$importSurvey <- renderUI({
       if (input$surveySelect == '') return()
-      actionButton("importSurvey", "Import Survey", icon = icon("upload"),
-                   width = "200px")
+      actionButton("importSurvey", 
+                   label = "Import Survey",
+                   onclick = "var $btn=$(this); setTimeout(function(){$btn.remove();},0);",
+                   icon = icon("upload"),
+                   width = "200px",
+                   style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
     })
   })
+  
   
   # 3. Importing survey brings summary data to make sure proper survey loaded 
   observeEvent(input$importSurvey, {
     # 
-    load_survey(sids[sids$name == input$surveySelect,]$id) # survey load on button push
+    # load_survey(sids[sids$name == input$surveySelect,]$id) # survey load on button push
     # 
     output$tab1 <- renderUI({
-      tabItem("gfk", h4("Imported Survey"), #value = "test1",
+      tabItem("qualsurvey", h4("Imported Survey"), 
               fluidRow(
                 box(width = 4,
                     renderTable(data.frame(Metadata = c("Name", "ID", "Created", "Responses", "Questions", "Blocks"),
@@ -133,37 +155,42 @@ server = function(input, output, session) {
   observeEvent(input$table_contents, {
     
     output$tab1 <- renderUI({
-      tab1_ui <- tabItem("gfk", h4("Survey Results"), value="test1",
+      tab1_ui <- tabItem("qualsurvey", h4("Survey Results"), value="test1",
                          fluidRow(
                            box(
                              width = 6,
-                             
                              validate(
-                               need(input$table_contents != "", "Plesae select a question from the dropdown...")
+                               need(input$table_contents != "", "Please select a question from the dropdown...")
                              ),
                              validate(
                                need(toc[toc$question_id == input$table_contents,]$question_type != "TE", "This app doesn't visualize text open-ends yet...")
                              ),
-                             renderPlot(question_summary(input$table_contents)$p1)
+                             renderPlot(question_summary(input$table_contents, input$my_color)$p1)
                            ),
                            box(
-                             width = 2,
+                             width = 3,
                              title_side = "left",
                              title = "Download",
-                             radioButtons("radio1", "Download Size", list("Half Slide","Full Slide"), inline = TRUE, selected = "Half Slide"),
+                             splitLayout(
+                               numericInput("width1", label = "Width (in)", value = 6.8),
+                               numericInput("height1", label = "Height (in)", value = 6.3),
+                               ),
                              downloadButton("downloadPlot1", "Download Plot")
                            )
                          ),
                          fluidRow(
                            box(
                              width = 6,
-                             renderPlot(question_summary(input$table_contents)$p1_flip)
+                             renderPlot(question_summary(input$table_contents, input$my_color)$p1_flip)
                            ),
                            box(
-                             width = 2,
+                             width = 3,
                              title_side = "left",
                              title = "Download",
-                             radioButtons("radio2", "Download Size", list("Half Slide","Full Slide"), inline = TRUE, selected = "Half Slide"),
+                             splitLayout(
+                               numericInput("width2", label = "Width (in)", value = 6.8),
+                               numericInput("height2", label = "Height (in)", value = 6.3),
+                             ),
                              downloadButton("downloadPlot2", "Download Plot")
                            )
                          )
@@ -172,15 +199,19 @@ server = function(input, output, session) {
     })
 })
   
-  # download handler with size and resolution set
+  # download handler 
   output$downloadPlot1 <- downloadHandler(
     filename = function(){
       paste0(d$name, "-Q", toc[toc$question_id == input$table_contents,]$question_order, ".png")
     },
     content = function(file){
-      req(question_summary(input$table_contents)$p1)
-      # showtext_opts(dpi = 300)
-      ggsave(file, plot = question_summary(input$table_contents)$p1, device = 'png', width = 6.8, height = 6.3, unit = "in")
+      # req(question_summary(input$table_contents)$p1)
+      ggsave(file, 
+             plot = question_summary(input$table_contents, input$my_color)$p1, 
+             device = 'png', 
+             width = input$width1, 
+             height = input$height1, 
+             unit = "in")
     }
   )
   
@@ -189,9 +220,13 @@ server = function(input, output, session) {
       paste0(d$name, "-Q", toc[toc$question_id == input$table_contents,]$question_order, "-flip.png")
     },
     content = function(file){
-      req(question_summary(input$table_contents)$p1_flip)
-      # showtext_opts(dpi = 300)
-      ggsave(file, plot = question_summary(input$table_contents)$p1_flip, device = 'png', width = 6.8, height = 6.3, unit = "in")
+      # req(question_summary(input$table_contents)$p1_flip)
+      ggsave(file, 
+             plot = question_summary(input$table_contents, input$my_color)$p1_flip, 
+             device = 'png', 
+             width = input$width2, 
+             height = input$height2, 
+             unit = "in")
     }
   )
   
