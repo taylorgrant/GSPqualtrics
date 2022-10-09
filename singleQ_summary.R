@@ -1,7 +1,7 @@
 # dataViz Single Question Summary #
 
 # Multiple Choice (MC)
-multichoice <- function(q) {
+multichoice <- function(q, color) {
   meta <- toc %>% filter(question_id == q)
   add_break <- function(x) gsub("(.{28,}?)\\s", "\\1\n", x)
   
@@ -30,11 +30,11 @@ multichoice <- function(q) {
     count(value) %>%
     mutate(frac = n/resp_count)
   # graph and output
-  out <- singleQ_barplot(tmp, meta$question_text, resp_count)
+  out <- singleQ_barplot(tmp, meta$question_text, resp_count, color)
 }
 
 # Text (only for Age question - TE)
-textage <- function(q) {
+textage <- function(q, color) {
   
   meta <- toc %>% filter(question_id == q)
   qpull <- svy_q %>%
@@ -70,7 +70,7 @@ textage <- function(q) {
       rename(value = group) %>%
       arrange(value)
     
-    out <- singleQ_barplot(tmp, meta$question_text, resp_count)
+    out <- singleQ_barplot(tmp, meta$question_text, resp_count, color)
   } else {
     tmp <- tmp %>% 
       mutate(yob = 2022 - value) %>% 
@@ -89,12 +89,12 @@ textage <- function(q) {
       rename(value = gen) %>% 
       arrange(value)
     
-    out <- singleQ_barplot(tmp, meta$question_text, resp_count)
+    out <- singleQ_barplot(tmp, meta$question_text, resp_count, color)
   }
 }
 
 # Rank Order (RO)
-rankorder <- function(q) {
+rankorder <- function(q, color) {
   meta <- toc %>% filter(question_id == q)
   add_break <- function(x) gsub("(.{21,}?)\\s", "\\1\n", x)
   
@@ -125,11 +125,11 @@ rankorder <- function(q) {
     group_by(choice_text) %>% 
     mutate(frac = n/resp_count)
   
-  out <- rankorderQ_barplot(tmp, meta$question_text, resp_count) 
+  out <- rankorderQ_barplot(tmp, meta$question_text, resp_count, color) 
 }
 
 # Slider (Slider)
-slider <- function(q) {
+slider <- function(q, color) {
   meta <- toc %>% filter(question_id == q)
   add_break <- function(x) gsub("(.{21,}?)\\s", "\\1\n", x)
   # get question names to pull columns from survey
@@ -153,20 +153,24 @@ slider <- function(q) {
     count(value) %>%
     mutate(frac = n/resp_count)
   # graph and output
-  out <- singleQ_barplot(tmp, meta$question_text, resp_count)
+  out <- singleQ_barplot(tmp, meta$question_text, resp_count, color)
 }
 
 # Matrix (Matrix)
-matrix_q <- function(q) {
+matrix_q <- function(q, color) {
+  
+  add_break <- function(x) gsub("(.{28,}?)\\s", "\\1\n", x)
   meta <- toc %>% filter(question_id == q)
   # pull colmap 
   matrix_map <- colmap %>% 
     filter(str_detect(ImportId, glue::glue("{q}_"))) %>% 
     select(name = qname, ImportId, choice_text = sub) %>% 
-    mutate(choice_text = trimws(gsub("\\ - .*", "", choice_text)))
+    mutate(choice_text = trimws(gsub("\\ - .*", "", choice_text)),
+           choice_text = add_break(choice_text))
   # pull matrix options for factor order
   qchoice <- svy_choice %>% 
-    filter(question_id == q)
+    filter(question_id == q) %>% 
+    mutate(choice_text = add_break(choice_text))
   
   tmp <- svy %>% 
     dplyr::select(ResponseId, all_of(matrix_map$name))
@@ -179,7 +183,9 @@ matrix_q <- function(q) {
     dplyr::filter(!str_detect(name, "TEXT"),
                   !is.na(value)) %>% 
     left_join(select(matrix_map, c(name, choice_text))) %>%
-    mutate(choice_text = factor(choice_text, levels = dput(unique(matrix_map$choice_text))),
+    mutate(choice_text = add_break(choice_text),
+           choice_text = factor(choice_text, levels = dput(unique(matrix_map$choice_text))),
+           value = add_break(value),
            value = factor(value, levels = dput(qchoice$choice_text))) %>%
     count(choice_text, value) %>% 
     group_by(choice_text) %>% 
