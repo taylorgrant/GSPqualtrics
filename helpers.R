@@ -52,11 +52,18 @@ load_survey <- function(sid) {
     mutate(description = trimws(description)) |>
     rename(block = description, question_id = elements)
   
+  # function to extract selector type (Likert, Bipolar, etc)
+  get_selector <- function(q) {
+    tmp <- d$questions[[q]]$questionType$selector
+  }
+  
   # keep a tidy TOC of distinct questions 
   toc <- svy_q |> 
     dplyr::distinct(question_id, .keep_all = TRUE) |> 
     left_join(blockbuild) |>  
-    relocate(block, .before = "question_order")
+    relocate(block, .before = "question_order") |> 
+    mutate(selector_type = map(question_id, get_selector)) |> 
+    unnest(cols = selector_type)
   
   # add age group and cohort options to the toc
   cohort_generation <- function(tbl) {
