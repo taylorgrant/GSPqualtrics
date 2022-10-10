@@ -123,12 +123,15 @@ rankorderQ_barplot <- function(dat, title, nsize) {
   data_plot <- list(data = pdat, p1 = p1, p1_flip = p1_flip)
 }
 
-matrixQ_barplot <- function(dat, title, nsize) {
+matrixQ_barplot <- function(dat, meta, nsize) {
   
   add_title_break <- function(x) gsub("(.{55,}?)\\s", "\\1\n", x)
+  # line break for the title
+  ptitle <- ifelse(str_count(meta$question_text, fixed(' ')) > 7, 
+                   add_title_break(meta$question_text), meta$question_text)
   
   # check to see if matrix question is statement comparison
-  if (any(str_detect(dat$choice_text, "[A-Za-z]:[A-Za-z]"))) {
+  if (meta$selector_type == "Bipolar") {
     # add a palette
     pal_choice <- function(tbl) {
       if (length(unique(tbl$value)) == 2) {
@@ -142,24 +145,14 @@ matrixQ_barplot <- function(dat, title, nsize) {
       }
     }
     pal <- pal_choice(dat)
-    add_statement_break <- function(x) gsub("(.{20,}?)\\s", "\\1\n", x)
     
     # add line breaks to statement and created grouped id for plot
-    pdat <- separate(dat, choice_text, 
-                    into = c("statement_a", "statement_b"), sep = ":") %>% 
-      mutate(statement_a = gsub("[\r\n\t]", " ", statement_a),
-             statement_b = gsub("[\r\n\t]", " ", statement_b),
-             statement_a = add_statement_break(statement_a),
-             statement_b = add_statement_break(statement_b)) %>%
+    pdat <- dat %>%
       group_by(value) %>%
       mutate(id = cumsum(!duplicated(statement_a))) %>% 
       group_by(id) %>% 
       mutate(choice_count = row_number(),
              txtcol = ifelse(choice_count > 2, "white", "black"))
-    
-    # line break for the title
-    ptitle <- ifelse(str_count(title, fixed(' ')) > 7, 
-                     add_title_break(title), title)
     
     p1 <- ggplot(pdat, aes(x = frac, y = reorder(statement_a, id),
                     fill = value)) +
@@ -179,12 +172,15 @@ matrixQ_barplot <- function(dat, title, nsize) {
            caption = glue::glue("Source: GS&P {d$name}\nN-size: {nsize} respondents")) +
       theme(legend.position = "none",
             plot.title.position = "plot")
+    
+    data_plot <- list(data = pdat, p1 = p1)
+    
   } else {
     pdat <- dat %>%
       mutate(txtcol = ifelse(frac < .075, "black", "black"),
              v_just = ifelse(frac < .075, -0.2, -0.2),
-             h_just = ifelse(frac < .075, -.1, 1.2),
-             p1size = ifelse(nrow(dat) > 6, 2, 4))
+             h_just = ifelse(frac < .075, -.05, -.05),
+             p1size = ifelse(nrow(dat) > 6, 2, 3))
     
     # add angle if value is too long
     if (any(nchar(as.character(pdat$value)) > 10) && nrow(pdat) > 3) {
@@ -197,17 +193,15 @@ matrixQ_barplot <- function(dat, title, nsize) {
       pdat$expansion <- 0
     }
     
-    ptitle <- ifelse(str_count(title, fixed(' ')) > 7, 
-                     add_title_break(title), title)
-    
     # graph (vertical bar)
     p1 <- ggplot(pdat, aes(x = choice_text, y = frac, group = value, fill = value)) +
       geom_bar(stat = "identity", position = "dodge") + 
       scale_y_continuous(labels = scales::percent) +
       scale_x_discrete(expand = expansion(add = unique(pdat$expansion))) +
+      scale_fill_brewer(palette = "Paired", name = NULL) +
       geom_text(aes(x = choice_text, y = frac, 
                     label = scales::percent(frac, accuracy = .1)),
-                position = position_dodge(width = .85),
+                position = position_dodge(width = 1),
                 vjust = pdat$v_just,
                 col = pdat$txtcol,
                 size = pdat$p1size
@@ -222,8 +216,35 @@ matrixQ_barplot <- function(dat, title, nsize) {
             plot.background = element_rect(fill = "white",
                                            color = 'white'),
             axis.text.x = element_text(angle = unique(pdat$txtangle), 
-                                       hjust = unique(pdat$txtjust)))
+                                       hjust = unique(pdat$txtjust)),
+            legend.text=element_text(size= 7),
+            legend.key.size = unit(.2, 'cm'))
+    
+    p1_flip <- ggplot(pdat, aes(x = choice_text, y = frac, group = value, fill = value)) +
+      geom_bar(stat = "identity", position = "dodge") + 
+      scale_y_continuous(labels = scales::percent,
+                         expand = expansion(mult = .1)) +
+      geom_text(aes(x = choice_text, y = frac,
+                    label = scales::percent(frac, accuracy = .1)),
+                position = position_dodge(width = .85),
+                hjust = pdat$h_just, col = pdat$txtcol,
+                size = pdat$p1size) +
+      scale_fill_brewer(palette = "Paired", name = NULL) +
+      labs(x = NULL, y = "Percent",
+           title = ptitle,
+           caption = glue::glue("Source: GS&P {d$name}\nN-size: {nsize} respondents")) + 
+      theme_xf() +
+      coord_flip() +
+      theme(plot.title.position = "plot",
+            legend.position = "top",
+            panel.background = element_rect(fill = "white",
+                                            colour = "white"),
+            plot.background = element_rect(fill = "white",
+                                           color = 'white'),
+            legend.text=element_text(size= 7),
+            legend.key.size = unit(.2, 'cm')) +
+      guides(fill=guide_legend(nrow=2,byrow=TRUE))
+    
+    data_plot <- list(data = pdat, p1 = p1, p1_flip = p1_flip)
   }
-  
-  data_plot <- list(data = pdat, p1 = p1)
 }
