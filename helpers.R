@@ -45,12 +45,16 @@ load_survey <- function(sid) {
     dplyr::as_tibble()
   
   # pull blocks and questions within each
-  blockbuild <- data.table::rbindlist(d$blocks) |>  
-    unnest(elements) |>  
-    unnest(elements) |> 
-    filter(!elements %in% c("Question", "PageBreak")) |>
-    mutate(description = trimws(description)) |>
-    rename(block = description, question_id = elements)
+  get_blocks <- function(bl) {
+    blockname <- d$blocks[[bl]]$description
+    
+    qids <- data.table::rbindlist(d$blocks[[bl]]$elements, fill = TRUE) %>% 
+      data.frame() %>% 
+      filter(type == "Question") %>% 
+      mutate(block = blockname) %>% 
+      select(-type, question_id = questionId)
+  }
+  blockbuild <- map_dfr(names(d$blocks), get_blocks)
   
   # function to extract selector type (Likert, Bipolar, etc)
   get_selector <- function(q) {
