@@ -19,6 +19,8 @@ sids <- readRDS("/srv/shiny-server/qualtrics-viz/data/qualtrics_sids.rds")
 # dashboard contains 3 parts - header, sidebar, and body # 
 header <- dashboardHeader(title = "Qualtrics Visualizer")
 
+# spectrumInput can't be called via renderUI b/c the selected color 
+# doesn't pass through until the menu is selected; 
 sidebar <- dashboardSidebar(
   width = 325,
   sidebarMenu(
@@ -44,7 +46,8 @@ sidebar <- dashboardSidebar(
                    as.list(scales::brewer_pal(palette = "Blues")(9)),
                    as.list(scales::brewer_pal(palette = "Greens")(9)),
                    as.list(scales::brewer_pal(palette = "Spectral")(11)),
-                   as.list(scales::brewer_pal(palette = "Dark2")(8))
+                   as.list(scales::brewer_pal(palette = "Dark2")(8)),
+                   as.list(scales::brewer_pal(palette = "Set1")(8))
                  ),
                  options = list(`toggle-palette-more-text` = "Show more")
                ))), 
@@ -110,7 +113,7 @@ server = function(input, output, session) {
   # 3. Importing survey brings summary data to make sure proper survey loaded 
   observeEvent(input$importSurvey, {
     # 
-    # load_survey(sids[sids$name == input$surveySelect,]$id) # survey load on button push
+    load_survey(sids[sids$name == input$surveySelect,]$id) # survey load on button push
     # 
     output$tab1 <- renderUI({
       tabItem("qualsurvey", h4("Imported Survey"), 
