@@ -161,12 +161,13 @@ matrix_q <- function(q, color) {
   
   add_break <- function(x) gsub("(.{28,}?)\\s", "\\1\n", x)
   meta <- toc %>% filter(question_id == q)
+  
   # pull colmap 
   matrix_map <- colmap %>% 
     filter(str_detect(ImportId, glue::glue("{q}_"))) %>% 
     select(name = qname, ImportId, choice_text = sub) %>% 
-    mutate(choice_text = trimws(gsub("\\ - .*", "", choice_text)),
-           choice_text = add_break(choice_text))
+    mutate(choice_text = trimws(gsub("\\ - .*", "", choice_text)))
+  
   # pull matrix options for factor order
   qchoice <- svy_choice %>% 
     filter(question_id == q) %>% 
@@ -174,24 +175,46 @@ matrix_q <- function(q, color) {
   
   tmp <- svy %>% 
     dplyr::select(ResponseId, all_of(matrix_map$name))
+  
   # get the respondent count answering the question
   resp_count <- sum((rowSums(is.na(tmp[2:ncol(tmp)])) == ncol(tmp[2:ncol(tmp)])) == "FALSE")
   
-  # summarize 
-  tmp <- tmp %>%
-    pivot_longer(-ResponseId) %>%  
-    dplyr::filter(!str_detect(name, "TEXT"),
-                  !is.na(value)) %>% 
-    left_join(select(matrix_map, c(name, choice_text))) %>%
-    mutate(choice_text = add_break(choice_text),
-           choice_text = factor(choice_text, levels = dput(unique(matrix_map$choice_text))),
-           value = add_break(value),
-           value = factor(value, levels = dput(qchoice$choice_text))) %>%
-    count(choice_text, value) %>% 
-    group_by(choice_text) %>% 
-    mutate(frac = n/resp_count)
-  
-  out <- matrixQ_barplot(tmp, meta$question_text, resp_count)
+  # for bipolar comparing two statements
+  if (meta$selector_type == "Bipolar") {
+    
+    add_statement_break <- function(x) gsub("(.{20,}?)\\s", "\\1\n", x)
+    
+    tmp <- tmp %>%
+      pivot_longer(-ResponseId) %>%  
+      dplyr::filter(!str_detect(name, "TEXT"),
+                    !is.na(value)) %>% 
+      left_join(select(matrix_map, c(name, choice_text))) %>%
+      mutate(choice_text = factor(choice_text, levels = dput(unique(matrix_map$choice_text))),
+             value = factor(value, levels = dput(qchoice$choice_text))) %>%
+      count(choice_text, value) %>% 
+      group_by(choice_text) %>% 
+      mutate(frac = n/resp_count) %>%
+      separate(choice_text, 
+               into = c("statement_a", "statement_b"), sep = ":") %>% 
+      mutate(statement_a = add_statement_break(statement_a),
+             statement_b = add_statement_break(statement_b))
+    
+  } else {
+    # summarize 
+    tmp <- tmp %>%
+      pivot_longer(-ResponseId) %>%  
+      dplyr::filter(!str_detect(name, "TEXT"),
+                    !is.na(value)) %>% 
+      left_join(select(matrix_map, c(name, choice_text))) %>%
+      mutate(choice_text = add_break(choice_text),
+             choice_text = factor(choice_text, levels = dput(add_break(unique(matrix_map$choice_text)))),
+             value = add_break(value),
+             value = factor(value, levels = dput(qchoice$choice_text))) %>%
+      count(choice_text, value) %>% 
+      group_by(choice_text) %>% 
+      mutate(frac = n/resp_count)
+  }
+  out <- matrixQ_barplot(tmp, meta, resp_count)
 }
 
 # Pick Group Rank (PGR)
