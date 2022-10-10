@@ -218,9 +218,14 @@ matrix_q <- function(q, color) {
 }
 
 # Pick Group Rank (PGR)
-pickgrouprank <- function(q) {
+pickgrouprank <- function(q, color) {
+  
+  meta <- toc %>% filter(question_id == q)
+  
   qpull <- colmap %>% 
     filter(str_detect(ImportId, glue::glue("{q}_")))
+  
+  add_break <- function(x) gsub("(.{15,}?)\\s", "\\1\n", x)
   
   tmp <- svy %>% 
     dplyr::select(ResponseId, all_of(qpull$qname))
@@ -246,9 +251,12 @@ pickgrouprank <- function(q) {
     }
     tmp <- merge_and_group(tmp) %>%
       filter(!is.na(response)) %>% 
-      select(value = response, choice_text = rank) %>% 
-      count(value, choice_text) %>% 
-      mutate(frac = n/resp_count)
+      select(choice_text = response, value = rank) %>% 
+      count(choice_text, value) %>% 
+      mutate(frac = n/resp_count,
+             choice_text = add_break(choice_text),
+             value = factor(value))
+    out <- matrixQ_barplot(tmp, meta, resp_count)
   } else {
     tmp <- tmp %>%
       pivot_longer(-ResponseId,
@@ -261,10 +269,13 @@ pickgrouprank <- function(q) {
       left_join(grps) %>%
       mutate(choice_text = factor(choice_text, levels = dput(grps$choice_text))) %>%
       count(choice_text, value) %>% 
-      mutate(frac = n/resp_count) %>% 
+      mutate(frac = n/resp_count,
+             value = add_break(value)) %>% 
       group_by(choice_text) %>% 
       arrange(desc(frac), .by_group = TRUE)
+    out <- pgrQ_barplot(tmp, meta, resp_count, color)
   }
+  
 }
 
 # DrillDown (DD)
