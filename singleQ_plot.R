@@ -175,12 +175,18 @@ matrixQ_barplot <- function(dat, meta, nsize) {
     
     data_plot <- list(data = pdat, p1 = p1)
     
-  } else {
+  } else { # if not bipolar
     pdat <- dat %>%
-      mutate(txtcol = ifelse(frac < .075, "black", "black"),
-             v_just = ifelse(frac < .075, -0.2, -0.2),
-             h_just = ifelse(frac < .075, -.05, -.05),
+      mutate(txtcol = "black",
+             v_just = -0.2,
+             h_just = -.05,
              p1size = ifelse(nrow(dat) > 6, 2, 3))
+    
+    pal <- c("#0073C2FF", "#EFC000FF", "#868686FF", "#CD534CFF", "#7AA6DCFF", 
+             "#003C67FF", "#8F7700FF", "#3B3B3BFF", "#A73030FF", "#4A6990FF",
+             "#FAFD7CFF", "#82491EFF", "#24325FFF", "#B7E4F9FF", "#FB6467FF", 
+             "#526E2DFF", "#E762D7FF", "#E89242FF", "#FAE48BFF", "#A6EEE6FF", 
+             "#917C5DFF", "#69C8ECFF") 
     
     # add angle if value is too long
     if (any(nchar(as.character(pdat$value)) > 10) && nrow(pdat) > 3) {
@@ -198,7 +204,7 @@ matrixQ_barplot <- function(dat, meta, nsize) {
       geom_bar(stat = "identity", position = "dodge") + 
       scale_y_continuous(labels = scales::percent) +
       scale_x_discrete(expand = expansion(add = unique(pdat$expansion))) +
-      scale_fill_brewer(palette = "Paired", name = NULL) +
+      scale_fill_manual(values = pal, name = NULL) +
       geom_text(aes(x = choice_text, y = frac, 
                     label = scales::percent(frac, accuracy = .1)),
                 position = position_dodge(width = 1),
@@ -229,7 +235,7 @@ matrixQ_barplot <- function(dat, meta, nsize) {
                 position = position_dodge(width = .85),
                 hjust = pdat$h_just, col = pdat$txtcol,
                 size = pdat$p1size) +
-      scale_fill_brewer(palette = "Paired", name = NULL) +
+      scale_fill_manual(values = pal, name = NULL) +
       labs(x = NULL, y = "Percent",
            title = ptitle,
            caption = glue::glue("Source: GS&P {d$name}\nN-size: {nsize} respondents")) + 
@@ -248,3 +254,81 @@ matrixQ_barplot <- function(dat, meta, nsize) {
     data_plot <- list(data = pdat, p1 = p1, p1_flip = p1_flip)
   }
 }
+
+pgrQ_barplot <- function(dat, meta, nsize, color) {
+  
+  add_title_break <- function(x) gsub("(.{55,}?)\\s", "\\1\n", x)
+  # line break for the title
+  ptitle <- ifelse(str_count(meta$question_text, fixed(' ')) > 7, 
+                   add_title_break(meta$question_text), meta$question_text)
+  
+  pdat <- dat %>%
+    mutate(txtcol = ifelse(frac < .075, "black", "white"),
+           v_just = ifelse(frac < .075, -0.2, 1.4),
+           h_just = ifelse(frac < .075, -.1, 1.2),
+           p1size = ifelse(nrow(dat) > 6, 3, 4),
+           cols = ifelse(length(unique(choice_text)) > 3, 2, 1))
+  
+  # add angle if value is too long
+  if (any(nchar(as.character(pdat$value)) > 10) && nrow(pdat) > 3) {
+    pdat$txtangle <- 45
+    pdat$txtjust <- 1
+    pdat$expansion <- 1.5
+  } else {
+    pdat$txtangle <- 0
+    pdat$txtjust <- 0.5
+    pdat$expansion <- 0
+  }
+  
+  # graph (vertical bar)
+  p1 <- ggplot(pdat, aes(x = value, y = frac)) +
+    geom_bar(stat = "identity", fill = color) +
+    facet_wrap(~choice_text, ncol = unique(pdat$cols),
+               scales = "free_y") +
+    scale_y_continuous(labels = scales::percent,
+                       expand = expansion(mult = .1)) +
+    scale_x_discrete(expand = expansion(add = unique(pdat$expansion))) +
+    geom_text(aes(x = value, y = frac, 
+                  label = scales::percent(frac, accuracy = .1)),
+              vjust = pdat$v_just, col = pdat$txtcol,
+              size = pdat$p1size) +
+    labs(x = NULL, y = "Percent",
+         title = ptitle,
+         caption = glue::glue("Source: GS&P {d$name}\nN-size: {nsize} respondents")) + 
+    theme_xf() +
+    theme(plot.title.position = "plot",
+          panel.background = element_rect(fill = "white",
+                                          colour = "white"),
+          plot.background = element_rect(fill = "white",
+                                         color = 'white'),
+          axis.text.x = element_text(angle = unique(pdat$txtangle), 
+                                     hjust = unique(pdat$txtjust)),
+          strip.background =element_rect(fill="lightgray", color = NA))
+  
+  p1_flip <- ggplot(pdat, aes(x = value, y = frac)) + 
+    geom_bar(stat = "identity", position = 'dodge', fill = color) +
+    facet_grid(choice_text~., switch = "y") +
+    scale_x_discrete(position = "top") + 
+    coord_flip() + 
+    theme_xf() + 
+    labs(x = NULL, y = "Percent",
+         title = ptitle,
+         caption = glue::glue("Source: GS&P {d$name}\nN-size: {nsize} respondents")) + 
+    scale_y_continuous(labels = scales::percent, 
+                       position = "right") +
+    geom_text(aes(x =value, y = frac, 
+                  label = scales::percent(frac, accuracy = .1)),
+              hjust = pdat$h_just, col = pdat$txtcol,
+              size = pdat$p1size) +
+    theme(panel.background = element_rect(fill = "white",
+                                          colour = "white"),
+          plot.background = element_rect(fill = "white",
+                                         color = 'white'),
+          plot.title.position = "plot",
+          strip.text.y.left = element_text(angle = 0, size = 8, hjust = .5),
+          strip.background = element_rect(fill = "#E8E8E8", color = "#E8E8E8"))
+  
+  data_plot <- list(data = pdat, p1 = p1, p1_flip = p1_flip)
+}
+
+
