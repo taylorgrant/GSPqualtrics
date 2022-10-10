@@ -72,7 +72,7 @@ rankorderQ_barplot <- function(dat, title, nsize) {
   # add a palette
   b2y <- c("#115f9a", "#1984c5", "#22a7f0", "#48b5c4", "#76c68f", "#a6d75b", "#c9e52f", "#d0ee11", "#d0f400")
   
-  add_title_break <- function(x) gsub("(.{55,}?)\\s", "\\1\n", x)
+  add_title_break <- function(x) gsub("(.{50,}?)\\s", "\\1\n", x)
   
   # graph -------------------------------------------------------------------
   # function to add a line break to title in front of a word (based on count of spaces)
@@ -125,7 +125,7 @@ rankorderQ_barplot <- function(dat, title, nsize) {
 
 matrixQ_barplot <- function(dat, meta, nsize) {
   
-  add_title_break <- function(x) gsub("(.{55,}?)\\s", "\\1\n", x)
+  add_title_break <- function(x) gsub("(.{50,}?)\\s", "\\1\n", x)
   # line break for the title
   ptitle <- ifelse(str_count(meta$question_text, fixed(' ')) > 7, 
                    add_title_break(meta$question_text), meta$question_text)
@@ -257,7 +257,7 @@ matrixQ_barplot <- function(dat, meta, nsize) {
 
 pgrQ_barplot <- function(dat, meta, nsize, color) {
   
-  add_title_break <- function(x) gsub("(.{55,}?)\\s", "\\1\n", x)
+  add_title_break <- function(x) gsub("(.{50,}?)\\s", "\\1\n", x)
   # line break for the title
   ptitle <- ifelse(str_count(meta$question_text, fixed(' ')) > 7, 
                    add_title_break(meta$question_text), meta$question_text)
