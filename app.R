@@ -1,6 +1,12 @@
+## Qualtrics Data Visualizer ## 
+
+
+# load packages -----------------------------------------------------------
 pacman::p_load(tidyverse, janitor, here, glue, qsurvey, 
                qualtRics, shinydashboard, shinyWidgets, gt)
 
+
+# load functions to help the app ------------------------------------------
 source('/srv/shiny-server/qualtrics-viz/helpers.R')
 source('/srv/shiny-server/qualtrics-viz/singleQ_summary.R')
 source('/srv/shiny-server/qualtrics-viz/singleQ_plot.R')
@@ -13,8 +19,13 @@ sids <- readRDS("/srv/shiny-server/qualtrics-viz/data/qualtrics_sids.rds")
 # SHINY APP  --------------------------------------------------------------
 
 # dashboard contains 3 parts - header, sidebar, and body # 
+
+
+# header ------------------------------------------------------------------
 header <- dashboardHeader(title = "Qualtrics Visualizer")
 
+
+# sidebar -----------------------------------------------------------------
 sidebar <- dashboardSidebar(
   width = 325,
   sidebarMenu(
@@ -57,6 +68,8 @@ sidebar <- dashboardSidebar(
   )
 )
 
+
+# body --------------------------------------------------------------------
 body <- dashboardBody(
   ## CSS styling for the validation error message on Monthly Sales ## 
   tags$head(
@@ -75,8 +88,13 @@ body <- dashboardBody(
   )
 )
 
+
+# build the UI ------------------------------------------------------------
 ui = dashboardPage(header, sidebar, body, skin = "black")
 
+
+
+# server side -------------------------------------------------------------
 server = function(input, output, session) { 
   
   # validation message to give people idea of where to go
@@ -105,7 +123,7 @@ server = function(input, output, session) {
   })
   
   observeEvent(input$importSurvey, {
-    # 
+    # load data here
     load_survey(sids[sids$name == input$surveySelect,]$id) # survey load on button push
     # 
     output$tab1 <- renderUI({
