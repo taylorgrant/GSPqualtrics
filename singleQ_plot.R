@@ -37,7 +37,15 @@ singleQ_plot <- function(dat, meta, nsize, color) {
       pdat$expansion <- 0
     }
     # graph (vertical bar)
-    p1 <- ggplot(pdat, aes(x = value, y = frac)) +
+    
+    if (meta$question_type == "MC" & !str_detect(meta$question_text, "How old are your children")) {
+      p <- ggplot(pdat, aes(x = reorder(value, desc(frac)), y = frac))
+    } else {
+      p <- ggplot(pdat, aes(x = value, y = frac))
+    }
+    
+    # p1 <- ggplot(pdat, aes(x = value, y = frac)) +
+    p1 <- p +
       geom_bar(stat = "identity", fill = color) +
       scale_y_continuous(labels = scales::percent) +
       scale_x_discrete(expand = expansion(add = unique(pdat$expansion))) +
