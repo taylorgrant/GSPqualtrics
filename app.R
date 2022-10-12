@@ -5,13 +5,18 @@
 pacman::p_load(tidyverse, janitor, here, glue, qsurvey, 
                qualtRics, shinydashboard, shinyWidgets, gt)
 
+# temporary - will have this on a cron job in the rstudio side # 
+# sids <- qualtRics::all_surveys() %>%
+#   dplyr::mutate(creationDate = as.Date(creationDate)) %>%
+#   dplyr::arrange(desc(creationDate))
+# saveRDS(sids, "/srv/shiny-server/qualtrics-viz/data/qualtrics_sids.rds")
 
 # load functions to help the app ------------------------------------------
-source('/srv/shiny-server/qualtrics-viz/helpers.R')
-source('/srv/shiny-server/qualtrics-viz/singleQ_summary.R')
-source('/srv/shiny-server/qualtrics-viz/singleQ_plot.R')
-source('/srv/shiny-server/qualtrics-viz/singleQ_table.R')
-source("/srv/shiny-server/qualtrics-viz/theme_xf.R")
+source('/srv/shiny-server/qualtrics-viz/R/helpers.R')
+source('/srv/shiny-server/qualtrics-viz/R/singleQ_summary.R')
+source('/srv/shiny-server/qualtrics-viz/R/singleQ_plot.R')
+source('/srv/shiny-server/qualtrics-viz/R/singleQ_table.R')
+source("/srv/shiny-server/qualtrics-viz/R/theme_xf.R")
 
 # load Qualtrics Survey IDs
 sids <- readRDS("/srv/shiny-server/qualtrics-viz/data/qualtrics_sids.rds")
