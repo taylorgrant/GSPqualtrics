@@ -29,6 +29,12 @@ multichoice <- function(q, meta, color) {
     mutate(value = factor(value, levels = dput(qchoice$choice_text))) %>%
     count(value) %>%
     mutate(frac = n/resp_count)
+  
+  if (!str_detect(meta$question_text, "How old are your children")) {
+    tmp <- tmp %>% 
+      mutate(value = forcats::fct_reorder(value, frac, max))
+  }
+  
   # graph and output
   out <- singleQ_plot(tmp, meta, resp_count, color)
 }
@@ -69,7 +75,7 @@ textage <- function(q, meta, color) {
       rename(value = group) %>%
       arrange(value)
 
-    out <- singleQ_barplot(tmp, meta, resp_count, color)
+    out <- singleQ_plot(tmp, meta, resp_count, color)
   } else {
     tmp <- tmp %>%
       mutate(yob = 2022 - value) %>%
@@ -211,7 +217,8 @@ matrix_q <- function(q, meta, color) {
              value = factor(value, levels = dput(qchoice$choice_text))) %>%
       count(choice_text, value) %>%
       group_by(choice_text) %>%
-      mutate(frac = n/resp_count)
+      mutate(frac = n/resp_count) %>% 
+      group_by(choice_text)
   }
   out <- singleQ_plot(tmp, meta, resp_count)
 }
