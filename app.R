@@ -1,32 +1,26 @@
-# Shiny App - Qualtrics Visual and Table #
-
 pacman::p_load(tidyverse, janitor, here, glue, qsurvey, 
-               qualtRics, shinydashboard, shinyWidgets)
+               qualtRics, shinydashboard, shinyWidgets, gt)
 
-# temporary - will have this on a cron job in the rstudio side # 
-# sids <- qualtRics::all_surveys() %>%
-#   dplyr::mutate(creationDate = as.Date(creationDate)) %>%
-#   dplyr::arrange(desc(creationDate))
-# saveRDS(sids, "/srv/shiny-server/qualtrics-viz/data/qualtrics_sids.rds")
-
+source('/srv/shiny-server/qualtrics-viz/helpers.R')
+source('/srv/shiny-server/qualtrics-viz/singleQ_summary.R')
+source('/srv/shiny-server/qualtrics-viz/singleQ_plot.R')
+source('/srv/shiny-server/qualtrics-viz/singleQ_table.R')
+source("/srv/shiny-server/qualtrics-viz/theme_xf.R")
 
 # load Qualtrics Survey IDs
 sids <- readRDS("/srv/shiny-server/qualtrics-viz/data/qualtrics_sids.rds")
-
 
 # SHINY APP  --------------------------------------------------------------
 
 # dashboard contains 3 parts - header, sidebar, and body # 
 header <- dashboardHeader(title = "Qualtrics Visualizer")
 
-# spectrumInput can't be called via renderUI b/c the selected color 
-# doesn't pass through until the menu is selected; 
 sidebar <- dashboardSidebar(
   width = 325,
   sidebarMenu(
     id = "tabs",
     convertMenuItem(
-      menuItem("Qualtrics Data", 
+      menuItem("Single Question Summary", 
                tabName = "qualsurvey", 
                icon = icon("square-poll-vertical"), 
                selected=T,
@@ -42,15 +36,22 @@ sidebar <- dashboardSidebar(
                  selected = "#0072B2",
                  flat = TRUE,
                  choices = list(
-                   list('black', 'white', 'blanchedalmond', 'steelblue', 'forestgreen'),
-                   as.list(scales::brewer_pal(palette = "Blues")(9)),
-                   as.list(scales::brewer_pal(palette = "Greens")(9)),
-                   as.list(scales::brewer_pal(palette = "Spectral")(11)),
-                   as.list(scales::brewer_pal(palette = "Dark2")(8)),
-                   as.list(scales::brewer_pal(palette = "Set1")(8))
+                   list('black','dodgerblue', 'forestgreen', "#666666"),
+                   list("#E69F00", "#0072B2", "#000000", "#56B4E9",
+                        "#009E73", "#F0E442", "#D55E00", "#CC79A7"),
+                   list("#003f5c", "#2f4b7c", "#665191", "#a05195",
+                        "#d45087", "#f95d6a", "#ff7c43", "#ffa600"),
+                   list("#001219", "#005f73", "#0a9396", "#94d2bd",
+                        "#e9d8a6", "#ee9b00", "#ca6702", "#bb3e03", "#ae2012",
+                        "#9b2226"),
+                   list("#115f9a", "#1984c5", "#22a7f0", "#48b5c4",
+                        "#76c68f", "#a6d75b", "#c9e52f", "#d0ee11", "#d0f400"),
+                   list('#E6004D', '#E64F00', '#FFAA00', '#FFFFFF', '#ECECF3',
+                        '#008558', "#1F69FF", "#6138F5", '#8B8B97', "#0D0D0F")
                  ),
                  options = list(`toggle-palette-more-text` = "Show more")
-               ))), 
+               ))
+               ), 
       "qualsurvey"
     )
   )
@@ -76,8 +77,6 @@ body <- dashboardBody(
 
 ui = dashboardPage(header, sidebar, body, skin = "black")
 
-
-# SERVER SIDE -------------------------------------------------------------
 server = function(input, output, session) { 
   
   # validation message to give people idea of where to go
@@ -87,16 +86,12 @@ server = function(input, output, session) {
     )
   })
   
-  # Menu Options for UI -----------------------------------------------------
-  
-  # 1. Select a survey to possibly load into environment
   output$surveySelect <- renderUI({
     selectInput("surveySelect", "Select a survey:",
                 c("", sids$name)
     )
   })
   
-  # 2. Import Survey button to trigger the import from API
   observeEvent(input$surveySelect, {
     output$importSurvey <- renderUI({
       if (input$surveySelect == '') return()
@@ -109,8 +104,6 @@ server = function(input, output, session) {
     })
   })
   
-  
-  # 3. Importing survey brings summary data to make sure proper survey loaded 
   observeEvent(input$importSurvey, {
     # 
     load_survey(sids[sids$name == input$surveySelect,]$id) # survey load on button push
@@ -121,8 +114,8 @@ server = function(input, output, session) {
                 box(width = 4,
                     renderTable(data.frame(Metadata = c("Name", "ID", "Created", "Responses", "Questions", "Blocks"),
                                            Response = c(d$name, d$id, d$creationDate, d$responseCounts$auditable,
-                                                   length(d$questions), length(d$blocks))))
-                    )
+                                                        length(d$questions), length(d$blocks))))
+                )
               ))
     })
     
@@ -131,8 +124,8 @@ server = function(input, output, session) {
       selectInput("block_contents", "Survey Block",
                   choices = c(unique(toc$block), "RESET / ALL BLOCKS"))
     })
-
-  #   # 4b. On load, pull in the survey questionnaire
+    
+    #   # 4b. On load, pull in the survey questionnaire
     output$tableContents <- renderUI({
       toc_list <- c("", toc$question_id)
       names(toc_list) <- c("", paste0("Q", toc$question_order, ": ", toc$question_text))
@@ -142,7 +135,7 @@ server = function(input, output, session) {
     })
   })
   
-  # 5. Allow the Survey Block selection to filter the questionnaire 
+  # 5. Allow the Survey Block selection to filter the questionnaire
   observeEvent(input$block_contents, {
     # call helper to filter questions as necessary
     updated_toc <- toc_filter(toc, input$block_contents)
@@ -154,9 +147,17 @@ server = function(input, output, session) {
     )
   })
   
-  # Render in the main dashboard
+  # run summary and plot function 
+  survey_data <- reactive({
+    question_summary(input$table_contents, input$my_color)
+  })
+  
+  # take reactive GT and render it for use
+  output$gt_table <- render_gt(
+    survey_data()$gt_tbl
+  )
+  
   observeEvent(input$table_contents, {
-    
     output$tab1 <- renderUI({
       tab1_ui <- tabItem("qualsurvey", h4("Survey Results"), value="test1",
                          fluidRow(
@@ -168,7 +169,7 @@ server = function(input, output, session) {
                              validate(
                                need(toc[toc$question_id == input$table_contents,]$question_type != "TE", "This app doesn't visualize text open-ends yet...")
                              ),
-                             renderPlot(question_summary(input$table_contents, input$my_color)$p1)
+                             renderPlot(survey_data()$p1)
                            ),
                            box(
                              width = 3,
@@ -177,14 +178,13 @@ server = function(input, output, session) {
                              splitLayout(
                                numericInput("width1", label = "Width (in)", value = 6.8),
                                numericInput("height1", label = "Height (in)", value = 6.3),
-                               ),
+                             ),
                              downloadButton("downloadPlot1", "Download Plot")
-                           )
-                         ),
+                           )),
                          fluidRow(
                            box(
                              width = 6,
-                             renderPlot(question_summary(input$table_contents, input$my_color)$p1_flip)
+                             renderPlot(survey_data()$p1_flip)
                            ),
                            box(
                              width = 3,
@@ -196,21 +196,41 @@ server = function(input, output, session) {
                              ),
                              downloadButton("downloadPlot2", "Download Plot")
                            )
+                         ),
+                         fluidRow(
+                           box(
+                             width = 6,
+                             validate(
+                               need(input$table_contents != "", "Please select a question from the dropdown...")
+                             ),
+                             validate(
+                               need(toc[toc$question_id == input$table_contents,]$question_type != "TE", "This app doesn't visualize text open-ends yet...")
+                             ),
+                             gt_output("gt_table")
+                           ),
+                           box(
+                             width = 3,
+                             title_side = "left",
+                             title = "Download",
+                             capture::capture(
+                               selector = "#gt_table",
+                               filename = paste0(d$name, "-Q", toc[toc$question_id == input$table_contents,]$question_order, "-TBL.png"),
+                               icon("download"), "Download Table"
+                             )
+                           )
                          )
-      )
-
+                         )
     })
-})
-  
+  })
+   
   # download handler 
   output$downloadPlot1 <- downloadHandler(
     filename = function(){
       paste0(d$name, "-Q", toc[toc$question_id == input$table_contents,]$question_order, ".png")
     },
     content = function(file){
-      # req(question_summary(input$table_contents)$p1)
       ggsave(file, 
-             plot = question_summary(input$table_contents, input$my_color)$p1, 
+             plot = survey_data()$p1,
              device = 'png', 
              width = input$width1, 
              height = input$height1, 
@@ -223,18 +243,16 @@ server = function(input, output, session) {
       paste0(d$name, "-Q", toc[toc$question_id == input$table_contents,]$question_order, "-flip.png")
     },
     content = function(file){
-      # req(question_summary(input$table_contents)$p1_flip)
       ggsave(file, 
-             plot = question_summary(input$table_contents, input$my_color)$p1_flip, 
+             plot = survey_data()$p1_flip,
              device = 'png', 
              width = input$width2, 
              height = input$height2, 
              unit = "in")
     }
-  )
-  
-  
-}
+  ) 
+    
+  }
 
 
 shinyApp(ui, server)
