@@ -34,27 +34,27 @@ load_survey <- function(sid) {
     dplyr::mutate(question_text = cleanFun(question_text), # strip html tags
                   question_text = gsub("[\r\n\t]", " ", question_text), # strip line breaks
                   question_text = trimws(gsub("\\s+", " ", question_text)),
-                  question_text = str_replace_all(question_text, "&quot;", "'")) |>  
+                  question_text = stringr::str_replace_all(question_text, "&quot;", "'")) |>  
     dplyr::filter(question_type != "DB") |> 
     dplyr::as_tibble()
   # get survey choices for each question
-  svy_choice <<- qsurvey::choices(design_object = d) %>%
+  svy_choice <<- qsurvey::choices(design_object = d) |> 
     dplyr::mutate(choice_text = cleanFun(choice_text), # strip html tags
                   choice_text = gsub("[\r\n\t]", " ", choice_text), # strip line breaks
-                  choice_text = trimws(gsub("\\s+", " ", choice_text))) %>%
+                  choice_text = trimws(gsub("\\s+", " ", choice_text))) |> 
     dplyr::as_tibble()
   
   # pull blocks and questions within each
   get_blocks <- function(bl) {
     blockname <- d$blocks[[bl]]$description
     
-    qids <- data.table::rbindlist(d$blocks[[bl]]$elements, fill = TRUE) %>% 
-      data.frame() %>% 
-      filter(type == "Question") %>% 
-      mutate(block = blockname) %>% 
-      select(-type, question_id = questionId)
+    qids <- data.table::rbindlist(d$blocks[[bl]]$elements, fill = TRUE) |>  
+      data.frame() |>  
+      dplyr::filter(type == "Question") |>  
+      dplyr::mutate(block = blockname) |>  
+      dplyr::select(-type, question_id = questionId)
   }
-  blockbuild <- map_dfr(names(d$blocks), get_blocks)
+  blockbuild <- purrr::map_dfr(names(d$blocks), get_blocks)
   
   # function to extract selector type (Likert, Bipolar, etc)
   get_selector <- function(q) {
@@ -62,34 +62,34 @@ load_survey <- function(sid) {
   }
   
   # keep a tidy TOC of distinct questions 
-  toc <- svy_q |> 
+  toc <<- svy_q |> 
     dplyr::distinct(question_id, .keep_all = TRUE) |> 
-    left_join(blockbuild) |>  
-    relocate(block, .before = "question_order") |> 
-    mutate(selector_type = map(question_id, get_selector)) |> 
-    unnest(cols = selector_type)
+    dplyr::left_join(blockbuild) |>  
+    dplyr::relocate(block, .before = "question_order") |> 
+    dplyr::mutate(selector_type = purrr::map(question_id, get_selector)) |> 
+    tidyr::unnest(cols = selector_type)
   
   # add age group and cohort options to the toc
   cohort_generation <- function(tbl) {
     if (any(toc$question_text == "How old are you? Please enter your current age below.")) {
       v1 <- tbl |> 
-        filter(question_text == "How old are you? Please enter your current age below.") |>
-        mutate(question_id = paste0(question_id, "a"),
-               question_type = "TE_AGE",
-               question_text = "Respondent breakdown by age cohort")
+        dplyr::filter(question_text == "How old are you? Please enter your current age below.") |>
+        dplyr::mutate(question_id = paste0(question_id, "a"),
+                      question_type = "TE_AGE",
+                      question_text = "Respondent breakdown by age cohort")
       
       v2 <- tbl |> 
-        filter(question_text == "How old are you? Please enter your current age below.") |>
-        mutate(question_id = paste0(question_id, "b"),
-               question_type = "TE_AGE",
-               question_text = "Respondent breakdown by generation")
+        dplyr::filter(question_text == "How old are you? Please enter your current age below.") |>
+        dplyr::mutate(question_id = paste0(question_id, "b"),
+                      question_type = "TE_AGE",
+                      question_text = "Respondent breakdown by generation")
       
-      age_add <- bind_rows(v1, v2)
+      age_add <- rbind(v1, v2)
     } 
                                   
   }
   toc <<- rbind(toc, cohort_generation(toc)) |> 
-    arrange(question_order)
+    dplyr::arrange(question_order)
 }
 
 # filter down the TOC questions by Block; and allow for RESET
@@ -97,18 +97,18 @@ toc_filter <- function(tbl, blck) {
   
   if (any(tbl$block == blck)) {
     tmp <- tbl |>  
-      filter(block %in% blck)  |>  
-      mutate(newtoc = paste0("Q", question_order, ": ", question_text))
+      dplyr::filter(block %in% blck)  |>  
+      dplyr::mutate(newtoc = paste0("Q", question_order, ": ", question_text))
     # now grab newtoc and set names
     tmptoc <- tmp$question_id |> 
-      set_names(nm = tmp$newtoc)
+      purrr::set_names(nm = tmp$newtoc)
 
   } else
     tmp <- tbl |>  
-      mutate(newtoc = paste0("Q", question_order, ": ", question_text))  
+      dplyr::mutate(newtoc = paste0("Q", question_order, ": ", question_text))  
   # now grab newtoc and set names
   tmptoc <- tmp$question_id |> 
-    set_names(nm = tmp$newtoc)
+    purrr::set_names(nm = tmp$newtoc)
 }
 
 
@@ -119,20 +119,20 @@ question_summary <- function(qid, color) {
   
   # based on question_type, run through summary function # 
   if (meta$question_type == "MC") {
-    out <- multichoice(qid, color)
+    out <- multichoice(qid, meta, color)
   } else if (meta$question_type == "TE_AGE") {
-    out <- textage(qid, color)
+    out <- textage(qid, meta, color)
   } else if (meta$question_type == "RO") {
-    out <- rankorder(qid, color)
+    out <- rankorder(qid, meta, color)
   } else if (meta$question_type == "Slider") {
-    out <- slider(qid, color)
+    out <- slider(qid, meta, color)
   } else if (meta$question_type == "Matrix") {
-    out <- matrix_q(qid, color)
+    out <- matrix_q(qid, meta, color)
   } else if (meta$question_type == "PGR") {
-    out <- pickgrouprank(qid, color)
+    out <- pickgrouprank(qid, meta, color)
   } else if (meta$question_type == "DD") {
-    out <- drilldown(qid, color)
-  } 
+    out <- drilldown(qid, meta, color)
+  }
   return(out)
 }
 
