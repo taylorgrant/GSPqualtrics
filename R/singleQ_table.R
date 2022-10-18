@@ -407,7 +407,7 @@ singleQ_table <- function(dat, meta, nsize) {
       tab_source_note( # adding source note
         source_note = html(glue::glue("<em>Source: GS&P {d$name} <br> N-size: {nsize} respondents</em>")) 
       ) %>% 
-      # add spanner over WAR
+      # add spanner 
       tab_spanner(
         label = "Rank",
         columns = everything()
