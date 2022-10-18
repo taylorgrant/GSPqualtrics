@@ -24,7 +24,7 @@ singleQ_table <- function(dat, meta, nsize) {
       ) %>%
       fmt_percent(
         columns = matches("frac"),
-        decimals = 1
+        decimals = 0
       )  %>%
       # styling the table --------------------------- 
     opt_table_font(
@@ -123,7 +123,7 @@ singleQ_table <- function(dat, meta, nsize) {
         # format our percentage options
         fmt_percent(
           columns = !contains("statement"),
-          decimals = 1
+          decimals = 0
         ) %>%
         # styling the table --------------------------- 
         opt_table_font(
@@ -231,7 +231,7 @@ singleQ_table <- function(dat, meta, nsize) {
           # format our rankings into percentages
           fmt_percent(
             columns = everything(),
-            decimals = 1
+            decimals = 0
           )  %>%
           # styling the table --------------------------- 
         opt_table_font(
@@ -319,7 +319,7 @@ singleQ_table <- function(dat, meta, nsize) {
           # format our rankings into percentages
           fmt_percent(
             columns = everything(),
-            decimals = 1
+            decimals = 0
           )  %>%
           # styling the table --------------------------- 
         opt_table_font(
@@ -415,7 +415,7 @@ singleQ_table <- function(dat, meta, nsize) {
       # format our rankings into percentages
       fmt_percent(
         columns = everything(),
-        decimals = 1
+        decimals = 0
       )  %>%
       # styling the table --------------------------- 
     opt_table_font(
@@ -509,7 +509,7 @@ singleQ_table <- function(dat, meta, nsize) {
         # format our rankings into percentages
         fmt_percent(
           columns = everything(),
-          decimals = 1
+          decimals = 0
         )  %>%
         # styling the table --------------------------- 
       opt_table_font(
