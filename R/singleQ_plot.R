@@ -50,7 +50,7 @@ singleQ_plot <- function(dat, meta, nsize, color) {
       scale_y_continuous(labels = scales::percent) +
       scale_x_discrete(expand = expansion(add = unique(pdat$expansion))) +
       geom_text(aes(x = value, y = frac,
-                    label = scales::percent(frac, accuracy = .1)),
+                    label = scales::percent(frac, accuracy = 1)),
                 vjust = pdat$v_just, col = pdat$txtcol,
                 size = pdat$p1size) +
       labs(x = NULL, y = "Percent",
@@ -69,7 +69,7 @@ singleQ_plot <- function(dat, meta, nsize, color) {
       geom_bar(stat = "identity", fill = color) +
       scale_y_continuous(labels = scales::percent) +
       geom_text(aes(x =value, y = frac,
-                    label = scales::percent(frac, accuracy = .1)),
+                    label = scales::percent(frac, accuracy = 1)),
                 hjust = pdat$h_just, col = pdat$txtcol) +
       labs(x = NULL, y = "Percent",
            title = ptitle,
@@ -213,7 +213,7 @@ singleQ_plot <- function(dat, meta, nsize, color) {
         scale_x_discrete(expand = expansion(add = unique(pdat$expansion))) +
         scale_fill_manual(values = matrix_pal, name = NULL) +
         geom_text(aes(x = choice_text, y = frac,
-                      label = scales::percent(frac, accuracy = .1)),
+                      label = scales::percent(frac, accuracy = 1)),
                   position = position_dodge(width = 1),
                   vjust = pdat$v_just,
                   col = pdat$txtcol,
@@ -238,7 +238,7 @@ singleQ_plot <- function(dat, meta, nsize, color) {
         scale_y_continuous(labels = scales::percent,
                            expand = expansion(mult = .1)) +
         geom_text(aes(x = choice_text, y = frac,
-                      label = scales::percent(frac, accuracy = .1)),
+                      label = scales::percent(frac, accuracy = 1)),
                   position = position_dodge(width = .85),
                   hjust = pdat$h_just, col = pdat$txtcol,
                   size = pdat$p1size) +
@@ -291,7 +291,7 @@ singleQ_plot <- function(dat, meta, nsize, color) {
                            expand = expansion(mult = .1)) +
         scale_x_discrete(expand = expansion(add = unique(pdat$expansion))) +
         geom_text(aes(x = value, y = frac,
-                      label = scales::percent(frac, accuracy = .1)),
+                      label = scales::percent(frac, accuracy = 1)),
                   vjust = pdat$v_just, col = pdat$txtcol,
                   size = pdat$p1size) +
         labs(x = NULL, y = "Percent",
@@ -319,7 +319,7 @@ singleQ_plot <- function(dat, meta, nsize, color) {
         scale_y_continuous(labels = scales::percent,
                            position = "right") +
         geom_text(aes(x =value, y = frac,
-                      label = scales::percent(frac, accuracy = .1)),
+                      label = scales::percent(frac, accuracy = 1)),
                   hjust = pdat$h_just, col = pdat$txtcol,
                   size = pdat$p1size) +
         theme(panel.background = element_rect(fill = "white",
