@@ -1,5 +1,6 @@
 # dataViz Single Question Summary #
 
+
 # Multiple Choice (MC)
 multichoice <- function(q, meta, color) {
   
@@ -30,10 +31,10 @@ multichoice <- function(q, meta, color) {
     count(value) %>%
     mutate(frac = n/resp_count)
   
-  if (!str_detect(meta$question_text, "How old are your children")) {
-    tmp <- tmp %>% 
-      mutate(value = forcats::fct_reorder(value, frac, max))
-  }
+  # if (!str_detect(meta$question_text, "How old are your children")) {
+  #   tmp <- tmp %>% 
+  #     mutate(value = forcats::fct_reorder(value, frac, max))
+  # }
   
   # graph and output
   out <- singleQ_plot(tmp, meta, resp_count, color)
