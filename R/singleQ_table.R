@@ -3,14 +3,6 @@
 singleQ_table <- function(dat, meta, nsize) {
  
   if (meta$question_type %in% c('MC', "TE_AGE", "Slider")) {
-
-    if (meta$question_type == "MC" & !str_detect(meta$question_text, "How old are your children")) {
-      dat <- dat %>% 
-        ungroup() %>% 
-        arrange(desc(frac))
-    } else {
-      dat <- dat
-    }
   
     gt_tbl <- dat %>%
       gt() %>% 
