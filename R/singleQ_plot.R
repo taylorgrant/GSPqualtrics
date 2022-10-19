@@ -1,6 +1,6 @@
 # Dataviz Single Question Data # 
 
-singleQ_plot <- function(dat, meta, nsize, color) {
+singleQ_plot <- function(dat, meta, nsize, color, ordered) {
   
   # line break for plot title
   add_title_break <- function(x) gsub("(.{55,}?)\\s", "\\1\n", x)
@@ -38,7 +38,7 @@ singleQ_plot <- function(dat, meta, nsize, color) {
     }
     # graph (vertical bar)
     
-    if (meta$question_type == "MC" & !str_detect(meta$question_text, "How old are your children")) {
+    if (ordered == "Yes") {
       p <- ggplot(pdat, aes(x = reorder(value, desc(frac)), y = frac))
     } else {
       p <- ggplot(pdat, aes(x = value, y = frac))
@@ -181,6 +181,7 @@ singleQ_plot <- function(dat, meta, nsize, color) {
         labs(x = NULL, y= NULL,
              title = ptitle,
              caption = glue::glue("Source: GS&P {d$name}\nN-size: {nsize} respondents")) +
+        theme_xf() + 
         theme(legend.position = "none",
               plot.title.position = "plot")
       
@@ -214,7 +215,7 @@ singleQ_plot <- function(dat, meta, nsize, color) {
         scale_fill_manual(values = matrix_pal, name = NULL) +
         geom_text(aes(x = choice_text, y = frac,
                       label = scales::percent(frac, accuracy = 1)),
-                  position = position_dodge(width = 1),
+                  position = position_dodge(width = .9),
                   vjust = pdat$v_just,
                   col = pdat$txtcol,
                   size = pdat$p1size
