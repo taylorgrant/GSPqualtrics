@@ -40,6 +40,12 @@ sidebar <- dashboardSidebar(
                br(),
                menuItem("Block list:", uiOutput("blockContents")),
                menuItem("Question List:", uiOutput("tableContents")),
+               menuItem("Reorder Data:", 
+                        radioButtons("reorder", 
+                                     label = "Reorder data by %?",
+                                     inline = TRUE,
+                                     choices = list("Yes", "No"), 
+                                     selected = "No")),
                menuItem("Color", spectrumInput(
                  inputId = "my_color",
                  label = "Pick a color:",
@@ -123,7 +129,7 @@ server = function(input, output, session) {
   
   observeEvent(input$importSurvey, {
     # load data here
-    load_survey(sids[sids$name == input$surveySelect,]$id) # survey load on button push
+    # load_survey(sids[sids$name == input$surveySelect,]$id) # survey load on button push
     # 
     output$tab1 <- renderUI({
       tabItem("qualsurvey", h4("Imported Survey"), 
@@ -166,7 +172,8 @@ server = function(input, output, session) {
   
   # run summary and plot function 
   survey_data <- reactive({
-    question_summary(input$table_contents, input$my_color)
+    # question_summary(input$table_contents, input$my_color)
+    singleQ_summary(input$table_contents, input$my_color, input$reorder)
   })
   
   # take reactive GT and render it for use
