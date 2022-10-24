@@ -112,29 +112,8 @@ toc_filter <- function(tbl, blck) {
 }
 
 
-# SINGLE QUESTION SUMMARY  ------------------------------------------------
 
-question_summary <- function(qid, color) {
-  meta <- toc %>% filter(question_id == qid)
-  
-  # based on question_type, run through summary function # 
-  if (meta$question_type == "MC") {
-    out <- multichoice(qid, meta, color)
-  } else if (meta$question_type == "TE_AGE") {
-    out <- textage(qid, meta, color)
-  } else if (meta$question_type == "RO") {
-    out <- rankorder(qid, meta, color)
-  } else if (meta$question_type == "Slider") {
-    out <- slider(qid, meta, color)
-  } else if (meta$question_type == "Matrix") {
-    out <- matrix_q(qid, meta, color)
-  } else if (meta$question_type == "PGR") {
-    out <- pickgrouprank(qid, meta, color)
-  } else if (meta$question_type == "DD") {
-    out <- drilldown(qid, meta, color)
-  }
-  return(out)
-}
+
 
 
 
