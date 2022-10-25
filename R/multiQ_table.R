@@ -1,6 +1,6 @@
 # GT Table - Crosstab Data # 
 
-multiQ_table <- function(dat, group_filter, target_filter = NULL) {
+multiQ_table <- function(dat, target_filter = NULL) {
   
   if (is.null(target_filter) == FALSE) {
     dat <- dat |> 
@@ -19,7 +19,7 @@ multiQ_table <- function(dat, group_filter, target_filter = NULL) {
     ) |>
     # caption 
     tab_source_note( # adding source note
-      source_note = html(glue::glue("<em>Source: GS&P {d$name} <br> N-size: {attributes(dat)$nsize} respondents<br>Column percentages won't always sum to 100% due to rounding or multi-select options</em>")) 
+      source_note = html(glue::glue("<em>Source: GS&P {d$name} <br> N-size: {attributes(dat)$nsize} respondents<br>Letters indicate statistical significance at {attributes(dat)$conf_level}<br>Column percentages won't always sum to 100% due to rounding or multi-select options</em>")) 
     ) |>
     # add spanner 
     tab_spanner(
@@ -27,10 +27,16 @@ multiQ_table <- function(dat, group_filter, target_filter = NULL) {
       columns = everything()
     ) |>
     # format percentages (hold out first row)
-    fmt_percent(
-      rows = id > 1,
-      columns = everything(),
-      decimals = 0
+    text_transform(
+      locations = cells_body(
+        rows = id > 1
+      ),
+      fn = function(x) {
+        str_replace_all(x,
+                        pattern = "-",
+                        replacement = "<SUP STYLE='font-size:xx-small'>") %>% 
+          str_replace_all("~",
+                          "</sup>") }
     ) |>
     # styling the table --------------------------- 
   opt_table_font(
@@ -86,12 +92,12 @@ multiQ_table <- function(dat, group_filter, target_filter = NULL) {
     ) |>
     # hide id column
     cols_hide(
-      columns = c("id", group_filter)
+      columns = c("id")
     ) |>
     # format missing data
     sub_missing(
       columns = everything(),
-      missing_text = "---"
+      missing_text = "0%"
     ) |>
     # final options
     tab_options(
