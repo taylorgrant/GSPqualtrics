@@ -2,23 +2,41 @@
 
 
 # load packages -----------------------------------------------------------
-pacman::p_load(tidyverse, janitor, here, glue, qsurvey, 
+pacman::p_load(tidyverse, janitor, here, glue, qsurvey, shiny,
                qualtRics, shinydashboard, shinyWidgets, gt)
-
-# load functions to help the app ------------------------------------------
-source('/srv/shiny-server/qualtrics-viz/R/helpers.R')
-source('/srv/shiny-server/qualtrics-viz/R/singleQ_summary.R')
-source('/srv/shiny-server/qualtrics-viz/R/singleQ_plot.R')
-source('/srv/shiny-server/qualtrics-viz/R/singleQ_table.R')
-source("/srv/shiny-server/qualtrics-viz/R/theme_xf.R")
 
 # load Qualtrics Survey IDs
 sids <- readRDS("/srv/shiny-server/qualtrics-viz/data/qualtrics_sids.rds")
 
+# colors 
+library(scales)
+col2Hex <- function(col) {
+  mat <- grDevices::col2rgb(col, alpha = TRUE)
+  grDevices::rgb(mat[1, ]/255, mat[2, ]/255, mat[3,]/255)
+}
+
+
+choices_brewer <- list(
+  "Xfinity" = c('#E6004D', '#E64F00', '#FFAA00', '#FFFFFF', '#ECECF3',
+                '#008558', "#1F69FF", "#6138F5", '#8B8B97', "#0D0D0F"),
+  "Blue-Red" = c("#001219", "#005f73", "#0a9396", "#94d2bd", 
+                 "#e9d8a6", "#ee9b00", "#ca6702", "#bb3e03", "#ae2012", 
+                 "#9b2226"),
+  "Set1" = c("#000000", "#E69F00", "#56B4E9", "#009E73", 
+             "#F0E442", "#0072B2", "#D55E00", "#CC79A7"),
+  "Solar" = c("#003f5c", "#2f4b7c", "#665191", "#a05195", 
+              "#d45087", "#f95d6a", "#ff7c43", "#ffa600"),
+  "Viridis" = rev(col2Hex(viridis_pal(option = "viridis")(8))),
+  "Magma" = rev(col2Hex(viridis_pal(option = "magma")(8))),
+  "Inferno" = rev(col2Hex(viridis_pal(option = "inferno")(8))),
+  "Plasma" = rev(col2Hex(viridis_pal(option = "plasma")(8))),
+  "Cividis" = rev(col2Hex(viridis_pal(option = "cividis")(8)))
+)
+
+
 # SHINY APP  --------------------------------------------------------------
 
 # dashboard contains 3 parts - header, sidebar, and body # 
-
 
 # header ------------------------------------------------------------------
 header <- dashboardHeader(title = "Qualtrics Visualizer")
@@ -46,30 +64,33 @@ sidebar <- dashboardSidebar(
                                      inline = TRUE,
                                      choices = list("Yes", "No"), 
                                      selected = "No")),
-               menuItem("Color", spectrumInput(
-                 inputId = "my_color",
-                 label = "Pick a color:",
-                 selected = "#0072B2",
-                 flat = TRUE,
-                 choices = list(
-                   list('black','dodgerblue', 'forestgreen', "#666666"),
-                   list("#E69F00", "#0072B2", "#000000", "#56B4E9",
-                        "#009E73", "#F0E442", "#D55E00", "#CC79A7"),
-                   list("#003f5c", "#2f4b7c", "#665191", "#a05195",
-                        "#d45087", "#f95d6a", "#ff7c43", "#ffa600"),
-                   list("#001219", "#005f73", "#0a9396", "#94d2bd",
-                        "#e9d8a6", "#ee9b00", "#ca6702", "#bb3e03", "#ae2012",
-                        "#9b2226"),
-                   list("#115f9a", "#1984c5", "#22a7f0", "#48b5c4",
-                        "#76c68f", "#a6d75b", "#c9e52f", "#d0ee11", "#d0f400"),
-                   list('#E6004D', '#E64F00', '#FFAA00', '#FFFFFF', '#ECECF3',
-                        '#008558', "#1F69FF", "#6138F5", '#8B8B97', "#0D0D0F")
-                 ),
-                 options = list(`toggle-palette-more-text` = "Show more")
-               ))
-               ), 
+               menuItem("Color",
+                        colorSelectorInput(
+                          inputId = "my_color",
+                          label = "Pick a color :",
+                          selected = choices_brewer$Set1[6],
+                          choices = choices_brewer,
+                          mode = "radio",
+                          display_label = TRUE
+                        )
+               )
+      ), 
       "qualsurvey"
-    )
+    ),
+    convertMenuItem(
+      menuItem("Crosstab Summary", tabName = "crosstab",
+               icon = icon("square-poll-vertical"),
+               selected=F,
+               menuItem("Grouping Variables:",
+                        uiOutput("groupBlock"),
+                        uiOutput("groupVariable")),
+               menuItem("Target Variables:",
+                        uiOutput("targetBlock"),
+                        uiOutput("targetVariable")),
+               menuItem("Group Filter", uiOutput("groupFilter")),
+               menuItem("Target Filter", uiOutput("targetFilter"))
+               ),
+      "crosstab")
   )
 )
 
@@ -89,6 +110,8 @@ body <- dashboardBody(
   tabItems(
     # conditionally render the output using inputs (see renderUI below)
     tabItem("qualsurvey", uiOutput("tab1"),
+            shinysky::busyIndicator(text = 'Please wait...', wait = 1500)),
+    tabItem("crosstab", uiOutput("tab2"),
             shinysky::busyIndicator(text = 'Please wait...', wait = 1500))
   )
 )
@@ -129,7 +152,7 @@ server = function(input, output, session) {
   
   observeEvent(input$importSurvey, {
     # load data here
-    # load_survey(sids[sids$name == input$surveySelect,]$id) # survey load on button push
+    load_survey(sids[sids$name == input$surveySelect,]$id) # survey load on button push
     # 
     output$tab1 <- renderUI({
       tabItem("qualsurvey", h4("Imported Survey"), 
@@ -243,10 +266,10 @@ server = function(input, output, session) {
                              )
                            )
                          )
-                         )
+      )
     })
   })
-   
+  
   # download handler 
   output$downloadPlot1 <- downloadHandler(
     filename = function(){
@@ -275,10 +298,124 @@ server = function(input, output, session) {
              unit = "in")
     }
   ) 
-    
-  }
+  
+  
+  # Tab 2 -------------------------------------------------------------------
+  
+  output$tab2 <- renderUI({
+    validate(
+      need(input$target_variable != "", "Please select your Group and Target variables to crosstab...")
+    )
+    validate(
+      need(input$group_variable != "", "Please select your Group and Target variables to crosstab...")
+    )
+  })
 
+  # -- GROUPING VARIABLES -- #
+  output$groupBlock <- renderUI({
+    selectInput("group_block", "Group Block",
+                choices = c(unique(toc$block), "RESET / ALL BLOCKS"))
+  })
+
+  output$groupVariable <- renderUI({
+    toc_list <- c("", toc[toc$question_type %in% c("MC", "TE_AGE"),]$question_id)
+    names(toc_list) <- c("", paste0("Q", toc[toc$question_type %in% c("MC", "TE_AGE"),]$question_order, ": ", toc[toc$question_type %in% c("MC", "TE_AGE"),]$question_text))
+    # names are seen by user, id is on the backend
+    selectInput("group_variable", "Grouping Question:",
+                choices = toc_list)
+  })
+
+
+  observeEvent(input$group_block, {
+    # call helper to filter questions as necessary
+    updated_toc <- group_toc_filter(toc, input$group_block)
+    # update
+    updateSelectInput(
+      session = session,
+      inputId = "group_variable",
+      choices = c("", updated_toc)
+    )
+  })
+
+  # -- TARGET VARIABLES -- #
+  output$targetBlock <- renderUI({
+    selectInput("target_block", "Target Block",
+                choices = c(unique(toc$block), "RESET / ALL BLOCKS"))
+  })
+
+  output$targetVariable <- renderUI({
+    toc_list <- c("", toc$question_id)
+    names(toc_list) <- c("", paste0("Q", toc$question_order, ": ", toc$question_text))
+    # names are seen by user, id is on the backend
+    selectInput("target_variable", "Target Question:",
+                choices = toc_list)
+  })
+
+
+  observeEvent(input$target_block, {
+    # call helper to filter questions as necessary
+    updated_toc <- toc_filter(toc, input$target_block)
+    # update
+    updateSelectInput(
+      session = session,
+      inputId = "target_variable",
+      choices = c("", updated_toc)
+    )
+  })
+  
+  # run summary and plot function 
+  crosstab_data <- reactive({
+    build_crosstab(input$group_variable, input$target_variable)
+  })
+  
+  output$groupFilter <- renderUI({
+    checkboxGroupInput("group_filter", "Select any variables you want to drop:",
+                choices = crosstab_data() %>% select(-c(target, id, target_group)) %>% names(),
+    )
+  })
+  
+  output$targetFilter <- 
+      renderUI({
+        if (attributes(crosstab_data())$target_qt %in% c("Matrix", "RO", "PGR")) {
+          checkboxGroupInput("target_filter", "Select any variables you want to drop:",
+                             choices = crosstab_data() %>% distinct(target_group) %>% filter(target_group != "") %>% pull())
+        }
+  })
+
+  # take reactive GT and render it for use
+  output$gt_crosstab <- render_gt(
+    multiQ_table(crosstab_data(), input$group_filter, input$target_filter)
+  )
+  
+  output$tab2 <- renderUI({
+    tab2_ui <- tabItem("crosstab", h4("Crosstab Results"), value="test2",
+                       fluidRow(
+                         box(
+                           width = 6,
+                           validate(
+                             need(input$target_variable != "", "Please select your Group and Target variables to crosstab...")
+                           ),
+                           validate(
+                             need(input$group_variable != "", "Please select your Group and Target variables to crosstab...")
+                           ),
+                           
+                           gt_output("gt_crosstab")
+                         ),
+                         box(
+                           width = 3,
+                           title_side = "left",
+                           title = "Download",
+                           capture::capture(
+                             selector = "#gt_crosstab",
+                             filename = paste0(d$name, "-Q", toc[toc$question_id == input$target_variable,]$question_order, "-CROSSTAB.png"),
+                             icon("download"), "Download Table"
+                           )
+                         )))
+  })
+}
 
 shinyApp(ui, server)
+
+
 
 
