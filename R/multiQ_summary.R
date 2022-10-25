@@ -256,8 +256,411 @@ get_responses <- function(q) {
   tmp
 }
 
+# pull groups for possible filter 
+group_filter <- function(group, target) {
+  
+  qs <- c(group, target)
+  # pull responses
+  tmp_responses <- map(qs, get_responses) %>% 
+    set_names(qs)
+  
+  groups <- tmp_responses[[1]] %>% 
+    left_join(tmp_responses[[2]], by = "ResponseId") %>% 
+    rename(group = value.x, target = value.y) %>%
+    filter(!is.na(target)) %>%
+    group_by(group) %>% 
+    summarise(total = n_distinct(ResponseId)) %>% 
+    pull(group)
+}
+
+sig_test_mc <- function(tbl, totals, conf_level, grp_filter) {
+
+  # pull the grouping variable
+  grp1 <- tbl %>%  
+    distinct(group) %>%
+    filter(!group %in% grp_filter) %>%
+    pull()
+  
+  # cross together so we get every pairing
+  groups <- crossing(grp1 = grp1, grp2 = grp1, target = tbl$target) %>% 
+    arrange(target) %>%
+    distinct(grp1, grp2, target, .keep_all = TRUE) 
+  
+  # now load in 
+  df <- groups %>% 
+    left_join(select(tbl, c(group, target, n)), by = c("grp1" = "group",
+                                                       "target" = "target")) %>% 
+    left_join(select(tbl, c(group, target, n)), by = c("grp2" = "group",
+                                                       "target" = "target")) %>%
+    left_join(totals, by = c("grp1" = "group")) %>% 
+    left_join(totals, by = c("grp2" = "group")) %>%
+    filter(grp1 %in% tbl[!tbl$group %in% grp_filter,]$group) %>% 
+    filter(grp2 %in% tbl[!tbl$group %in% grp_filter,]$group) %>%
+    filter(grp1 != grp2) %>% 
+    mutate(across(n.x:n.y, ~replace_na(., 0)))
+  
+  df <- df %>% 
+    mutate(
+      signif = list(n.x, n.y, total.x, total.y) %>% pmap(~ {
+        prop.test(
+          x = c(..1, ..2),
+          n = c(..3, ..4),
+          conf.level = as.numeric(conf_level)
+        ) %>% broom::tidy()
+      })) %>% 
+    unnest(cols = signif) %>%
+    mutate(test = as.numeric(grp1) - (min(as.numeric(grp1) - 1)),
+           test = LETTERS[test]) %>% 
+    mutate(test = ifelse(((p.value < (1 - as.numeric(conf_level))) & (estimate2 > estimate1)), test, NA)) %>% 
+    filter(!is.na(test)) %>%
+    group_by(grp2, target) %>% 
+    summarise(sig.test = paste(test, collapse = ", "))
+  
+  tmp_out <- tbl %>% 
+    left_join(df, by = c("group" = 'grp2',
+                         "target" = "target")) %>%
+    mutate(frac = scales::percent(frac, accuracy = 1)) %>%
+    unite("frac", c(frac, sig.test), sep = "-") %>% 
+    mutate(frac = str_replace_all(frac, "-NA", "")) %>%
+    filter(!group %in% grp_filter)
+  
+  total_row <- tmp_out %>% 
+    ungroup() %>% 
+    distinct(group, total) %>% 
+    janitor::adorn_totals() %>%
+    mutate(test = row_number(),
+           test = ifelse(group != "Total",
+                         LETTERS[test], "-")) %>%
+    t() %>% 
+    data.frame() %>% 
+    janitor::row_to_names(row_number = 1) %>%
+    tibble() %>% 
+    mutate(across(everything(), str_trim)) %>%
+    relocate(Total, .before = everything()) %>%
+    mutate(target = "Total Count (Answering)") %>%
+    relocate(target, .before = everything()) 
+  
+  total_frac <- tmp_out %>% 
+    ungroup() %>% 
+    group_by(target) %>% 
+    tally(n) %>% 
+    mutate(Total = n/as.numeric(total_row$Total[1]),
+           Total = scales::percent(Total, accuracy = 1))
+  
+  tbl_data <- bind_rows(total_row, tmp_out %>% 
+                          pivot_wider(id_cols = c(target), 
+                                      names_from = group, 
+                                      values_from = frac) %>%
+                          mutate(target = as.character(target)) %>%
+                          left_join(select(total_frac, -n)) %>% 
+                          relocate(Total, .after = "target")) %>% 
+    mutate(id = row_number(), # used to set rule for % formatting
+           target_group = ifelse(str_detect(target, "Total Count"), "", "Response"),
+           target = ifelse(Total == "-", "", target)) 
+
+}
+
+sig_test_matrix <- function(tbl, totals, conf_level, grp_filter) {
+  
+  # pull the grouping variable
+  grp1 <- tbl %>%  
+    distinct(group) %>%
+    filter(!group %in% grp_filter) %>%
+    pull()
+  
+  # cross together so we get every pairing
+  groups <- crossing(grp1 = grp1, grp2 = grp1, choice_text = tbl$choice_text, target = tbl$target) %>% 
+    arrange(target) %>%
+    distinct(grp1, grp2, choice_text, target, .keep_all = TRUE) 
+  
+  df <- groups %>% 
+    left_join(select(tbl, c(group, choice_text, target, n)), 
+              by = c("grp1" = "group",
+                     "choice_text" = "choice_text",
+                     "target" = "target")) %>% 
+    left_join(select(tbl, c(group, choice_text, target, n)), 
+              by = c("grp2" = "group",
+                     "choice_text" = "choice_text",
+                     "target" = "target")) %>%
+    left_join(totals, by = c("grp1" = "group")) %>% 
+    left_join(totals, by = c("grp2" = "group")) %>%
+    filter(grp1 %in% tbl[!tbl$group %in% grp_filter,]$group) %>% 
+    filter(grp2 %in% tbl[!tbl$group %in% grp_filter,]$group) %>%
+    filter(grp1 != grp2) %>% 
+    mutate(across(n.x:n.y, ~replace_na(., 0)))
+  
+  df <- df %>% 
+    mutate(
+      signif = list(n.x, n.y, total.x, total.y) %>% pmap(~ {
+        prop.test(
+          x = c(..1, ..2),
+          n = c(..3, ..4),
+          conf.level = as.numeric(conf_level)
+        ) %>% broom::tidy()
+      })) %>% 
+    unnest(cols = signif) %>%
+    mutate(test = as.numeric(grp1) - (min(as.numeric(grp1) - 1)),
+           test = LETTERS[test]) %>% 
+    mutate(test = ifelse(((p.value < (1 - as.numeric(conf_level))) & (estimate2 > estimate1)), test, NA)) %>% 
+    filter(!is.na(test)) %>%
+    group_by(grp2, choice_text, target) %>% 
+    summarise(sig.test = paste(test, collapse = ", "))
+  
+  tmp_out <- tbl %>% 
+    left_join(df, by = c("group" = 'grp2',
+                         "choice_text" = "choice_text",
+                         "target" = "target")) %>%
+    mutate(frac = scales::percent(frac, accuracy = 1)) %>%
+    unite("frac", c(frac, sig.test), sep = "-") %>% 
+    mutate(frac = str_replace_all(frac, "-NA", "")) %>%
+    filter(!group %in% grp_filter)
+  
+  total_row <- tmp_out %>% 
+    ungroup() %>% 
+    distinct(group, total) %>% 
+    janitor::adorn_totals() %>%
+    mutate(test = row_number(),
+           test = ifelse(group != "Total",
+                         LETTERS[test], "-")) %>%
+    t() %>% 
+    data.frame() %>% 
+    janitor::row_to_names(row_number = 1) %>%
+    tibble() %>% 
+    mutate(across(everything(), str_trim)) %>%
+    relocate(Total, .before = everything()) %>%
+    mutate(target = "Total Count (Answering)",
+           choice_text = "") %>%
+    relocate(target, .before = everything())
+  
+  total_frac <- tmp_out %>% 
+    ungroup() %>% 
+    group_by(choice_text, target) %>% 
+    tally(n) %>% 
+    mutate(Total = n/as.numeric(total_row$Total[1]),
+           Total = scales::percent(Total, accuracy = 1))
+  
+  tbl_data <- bind_rows(total_row, tmp_out %>% 
+                          pivot_wider(id_cols = c(choice_text, target), 
+                                      names_from = group, 
+                                      values_from = frac) %>%
+                          mutate(target = as.character(target)) %>%
+                          left_join(select(total_frac, -n)) %>% 
+                          relocate(Total, .after = "target")) %>% 
+    mutate(id = row_number(), # used to set rule for % formatting
+           target = ifelse(Total == "-", "", target)) %>%
+    rename(target_group = choice_text)
+  
+}
+
+sig_test_bipolar <- function(tbl, totals, conf_level, grp_filter) {
+  
+  # pull the grouping variable
+  grp1 <- tbl %>%  
+    distinct(group) %>%
+    filter(!group %in% grp_filter) %>%
+    pull()
+  
+  # cross together so we get every pairing
+  groups <- crossing(grp1 = grp1, grp2 = grp1, choice_text = tbl$choice_text, target = tbl$target) %>% 
+    arrange(target) %>%
+    distinct(grp1, grp2, choice_text, target, .keep_all = TRUE) 
+  
+  df <- groups %>% 
+    left_join(select(tbl, c(group, choice_text, target, n)), 
+              by = c("grp1" = "group",
+                     "choice_text" = "choice_text",
+                     "target" = "target")) %>% 
+    left_join(select(tbl, c(group, choice_text, target, n)), 
+              by = c("grp2" = "group",
+                     "choice_text" = "choice_text",
+                     "target" = "target")) %>%
+    left_join(totals, by = c("grp1" = "group")) %>% 
+    left_join(totals, by = c("grp2" = "group")) %>%
+    filter(grp1 %in% tbl[!tbl$group %in% grp_filter,]$group) %>% 
+    filter(grp2 %in% tbl[!tbl$group %in% grp_filter,]$group) %>%
+    filter(grp1 != grp2) %>% 
+    mutate(across(n.x:n.y, ~replace_na(., 0)))
+  
+  df <- df %>% 
+    mutate(
+      signif = list(n.x, n.y, total.x, total.y) %>% pmap(~ {
+        prop.test(
+          x = c(..1, ..2),
+          n = c(..3, ..4),
+          conf.level = as.numeric(conf_level)
+        ) %>% broom::tidy()
+      })) %>% 
+    unnest(cols = signif) %>%
+    mutate(test = as.numeric(grp1) - (min(as.numeric(grp1) - 1)),
+           test = LETTERS[test]) %>% 
+    mutate(test = ifelse(((p.value < (1 - as.numeric(conf_level))) & (estimate2 > estimate1)), test, NA)) %>% 
+    filter(!is.na(test)) %>%
+    group_by(grp2, choice_text, target) %>% 
+    summarise(sig.test = paste(test, collapse = ", "))
+  
+  tmp_out <- tbl %>% 
+    left_join(df, by = c("group" = 'grp2',
+                         "choice_text" = "choice_text",
+                         "target" = "target")) %>%
+    mutate(frac = scales::percent(frac, accuracy = 1)) %>%
+    unite("frac", c(frac, sig.test), sep = "-") %>% 
+    mutate(frac = str_replace_all(frac, "-NA", "")) %>%
+    filter(!group %in% grp_filter)
+  
+  total_row <- tmp_out %>% 
+    ungroup() %>% 
+    distinct(group, total) %>% 
+    janitor::adorn_totals() %>%
+    mutate(test = row_number(),
+           test = ifelse(group != "Total",
+                         LETTERS[test], "-")) %>%
+    t() %>% 
+    data.frame() %>% 
+    janitor::row_to_names(row_number = 1) %>%
+    tibble() %>% 
+    mutate(across(everything(), str_trim)) %>%
+    relocate(Total, .before = everything()) %>%
+    mutate(choice_text = "Total Count (Answering)",
+           group = "") %>%
+    relocate(choice_text, .before = everything())
+  
+  total_frac <- tmp_out %>% 
+    ungroup() %>% 
+    group_by(choice_text, target) %>% 
+    tally(n) %>% 
+    mutate(Total = n/as.numeric(total_row$Total[1]),
+           Total = scales::percent(Total, accuracy = 1)) %>%
+    group_by(choice_text) %>% 
+    mutate(choice = row_number()) %>% 
+    group_by(choice) %>% 
+    mutate(id = cumsum(!duplicated(choice_text)),
+           group = LETTERS[id]) %>% 
+    mutate(choice_text = ifelse(choice == min(.$choice), gsub("\\:.*", "", choice_text),
+                                ifelse(choice == max(.$choice), gsub(".*\\:", "", choice_text),
+                                       "---"))) %>%
+    ungroup %>%
+    select(choice, Total, group)
+  
+  tbl_data <- bind_rows(total_row, tmp_out %>% 
+                          pivot_wider(id_cols = c(choice_text, target), 
+                                      names_from = group, 
+                                      values_from = frac) %>%
+                          group_by(choice_text) %>% 
+                          mutate(choice = row_number()) %>% 
+                          group_by(choice) %>% 
+                          mutate(id = cumsum(!duplicated(choice_text)),
+                                 group = LETTERS[id]) %>% 
+                          mutate(choice_text = ifelse(choice == min(.$choice), gsub("\\:.*", "", choice_text),
+                                                      ifelse(choice == max(.$choice), gsub(".*\\:", "", choice_text),
+                                                             "---"))) %>% 
+                          ungroup %>% 
+                          select(-c(target, id)) %>% 
+                          left_join(total_frac, by = c("choice" = "choice",
+                                                       "group" = "group")) %>%
+                          relocate(Total, .after = "choice_text")) %>% 
+    select(-choice) %>%
+    mutate(id = row_number(), # used to set rule for % formatting
+           choice_text = ifelse(Total == "-", "", choice_text)) %>%
+    rename(target = choice_text,
+           target_group = group)
+  
+}
+
+sig_test_ro <- function(tbl, totals, conf_level, grp_filter) {
+  
+  # pull the grouping variable
+  grp1 <- tbl %>%  
+    distinct(group) %>%
+    filter(!group %in% grp_filter) %>%
+    pull()
+  
+  # cross together so we get every pairing
+  groups <- crossing(grp1 = grp1, grp2 = grp1, choice_text = tbl$choice_text, target = tbl$target) %>% 
+    arrange(target) %>%
+    distinct(grp1, grp2, choice_text, target, .keep_all = TRUE) 
+  
+  df <- groups %>% 
+    left_join(select(tbl, c(group, choice_text, target, n)), 
+              by = c("grp1" = "group",
+                     "choice_text" = "choice_text",
+                     "target" = "target")) %>% 
+    left_join(select(tbl, c(group, choice_text, target, n)), 
+              by = c("grp2" = "group",
+                     "choice_text" = "choice_text",
+                     "target" = "target")) %>%
+    left_join(totals, by = c("grp1" = "group")) %>% 
+    left_join(totals, by = c("grp2" = "group")) %>%
+    filter(grp1 %in% tbl[!tbl$group %in% grp_filter,]$group) %>% 
+    filter(grp2 %in% tbl[!tbl$group %in% grp_filter,]$group) %>%
+    filter(grp1 != grp2) %>% 
+    mutate(across(n.x:n.y, ~replace_na(., 0)))
+  
+  df <- df %>% 
+    mutate(
+      signif = list(n.x, n.y, total.x, total.y) %>% pmap(~ {
+        prop.test(
+          x = c(..1, ..2),
+          n = c(..3, ..4),
+          conf.level = as.numeric(conf_level)
+        ) %>% broom::tidy()
+      })) %>% 
+    unnest(cols = signif) %>%
+    mutate(test = as.numeric(grp1) - (min(as.numeric(grp1) - 1)),
+           test = LETTERS[test]) %>% 
+    mutate(test = ifelse(((p.value < (1 - as.numeric(conf_level))) & (estimate2 > estimate1)), test, NA)) %>% 
+    filter(!is.na(test)) %>%
+    group_by(grp2, choice_text, target) %>% 
+    summarise(sig.test = paste(test, collapse = ", "))
+  
+  tmp_out <- tbl %>% 
+    left_join(df, by = c("group" = 'grp2',
+                         "choice_text" = "choice_text",
+                         "target" = "target")) %>%
+    mutate(frac = scales::percent(frac, accuracy = 1)) %>%
+    unite("frac", c(frac, sig.test), sep = "-") %>% 
+    mutate(frac = str_replace_all(frac, "-NA", "")) %>%
+    filter(!group %in% grp_filter)
+  
+  total_row <- tmp_out %>% 
+    ungroup() %>% 
+    distinct(group, total) %>% 
+    janitor::adorn_totals() %>%
+    mutate(test = row_number(),
+           test = ifelse(group != "Total",
+                         LETTERS[test], "-")) %>%
+    t() %>% 
+    data.frame() %>% 
+    janitor::row_to_names(row_number = 1) %>%
+    tibble() %>% 
+    mutate(across(everything(), str_trim)) %>%
+    relocate(Total, .before = everything()) %>%
+    mutate(choice_text = "Total Count (Answering)",
+           target = "") %>%
+    relocate(target, .before = everything()) %>%
+    relocate(choice_text, .before = everything())
+  
+  total_frac <- tmp_out %>% 
+    ungroup() %>% 
+    group_by(choice_text, target) %>% 
+    tally(n) %>% 
+    mutate(Total = n/as.numeric(total_row$Total[1]),
+           Total = scales::percent(Total, accuracy = 1))
+  
+  tbl_data <- bind_rows(total_row, tmp_out %>% 
+                          pivot_wider(id_cols = c(choice_text, target), 
+                                      names_from = group, 
+                                      values_from = frac) %>%
+                          mutate(target = as.character(target)) %>%
+                          left_join(select(total_frac, -n)) %>% 
+                          relocate(Total, .after = "target")) %>% 
+    mutate(id = row_number(), # used to set rule for % formatting
+           choice_text = ifelse(Total == "-", "", choice_text)) %>%
+    rename(target = choice_text,
+           target_group = target)
+}
+
 # function to pull responses, merge on responseID, and crosstab
-build_crosstab <- function(group, target) {
+build_crosstab <- function(group, target, conf_level, group_filter) {
   
   qs <- c(group, target)
   # pull responses
@@ -299,35 +702,7 @@ build_crosstab <- function(group, target) {
       mutate(frac = n/total) %>%
       ungroup()
     
-    # create totals
-    total_row <- out %>% 
-      ungroup() %>% 
-      distinct(group, total) %>% 
-      janitor::adorn_totals() %>%
-      pivot_wider(names_from = group, 
-                  values_from = total) %>% 
-      relocate(Total, .before = everything()) %>%
-      mutate(target = "Total Count (Answering)") %>%
-      relocate(target, .before = everything())
-    
-    # create total percentages
-    total_frac <- out %>% 
-      ungroup() %>% 
-      group_by(target) %>% 
-      tally(n) %>% 
-      mutate(Total = n/total_row$Total,
-             target = as.character(target))
-    
-    # reorganize for GT table
-    tbl_data <- bind_rows(total_row, out %>% 
-                            pivot_wider(id_cols = c(target), 
-                                        names_from = group, 
-                                        values_from = frac) %>%
-                            mutate(target = as.character(target)) %>%
-                            left_join(select(total_frac, -n)) %>% 
-                            relocate(Total, .after = "target")) %>% 
-      mutate(id = row_number(), # used to set rule for % formatting
-             target_group = ifelse(str_detect(target, "Total Count"), "", "Response"))
+    tbl_data <- sig_test_mc(out, group_totals, conf_level, group_filter)
     
   } else if (target_qt %in% c("Matrix", "RO", "PGR")) {
     
@@ -340,124 +715,47 @@ build_crosstab <- function(group, target) {
     
     if (target_st != "Bipolar") { 
       
-      # create totals
-      total_row <- out %>% 
-        ungroup() %>% 
-        distinct(group, total) %>% 
-        janitor::adorn_totals() %>%
-        pivot_wider(names_from = group, 
-                    values_from = total) %>% 
-        relocate(Total, .before = everything()) %>%
-        mutate(target = "Total Count (Answering)",
-               choice_text = "") %>%
-        relocate(target, .before = everything()) %>% 
-        relocate(choice_text, .before = everything())
+      tbl_data <- sig_test_matrix(out, group_totals, conf_level, group_filter)
       
-      # create total percentages
-      total_frac <- out %>% 
-        ungroup() %>% 
-        group_by(choice_text, target) %>% 
-        tally(n) %>% 
-        mutate(Total = n/total_row$Total)
-      
-      # build/format GT table
-      tbl_data <- bind_rows(total_row, out %>% 
-                              pivot_wider(id_cols = c(choice_text, target),
-                                          names_from = group,
-                                          values_from = frac) %>% 
-                              left_join(select(total_frac, -n)) %>%
-                              relocate(Total, .after = "target")) %>% 
-        mutate(id = row_number())  %>% # used to set rule for % formatting
-        rename(target_group = choice_text) # rename for table template
       
     } else if (target_st == "Bipolar") {
       
-      # create totals
-      total_row <- out %>% 
-        ungroup() %>% 
-        distinct(group, total) %>% 
-        janitor::adorn_totals() %>%
-        pivot_wider(names_from = group, 
-                    values_from = total) %>% 
-        relocate(Total, .before = everything()) %>%
-        mutate(choice_text = "Total Count (Answering)",
-               group = "") %>%
-        relocate(choice_text, .before = everything())
+      tbl_data <- sig_test_bipolar(out, group_totals, conf_level, group_filter)
       
-      # create total percentages
-      total_frac <- out %>% 
-        ungroup() %>% 
-        group_by(choice_text, target) %>% 
-        tally(n) %>% 
-        mutate(Total = n/total_row$Total) %>% 
-        group_by(choice_text) %>% 
-        mutate(choice = row_number()) %>% 
-        group_by(choice) %>% 
-        mutate(id = cumsum(!duplicated(choice_text)),
-               group = LETTERS[id]) %>% 
-        mutate(choice_text = ifelse(choice == min(.$choice), gsub("\\:.*", "", choice_text),
-                                    ifelse(choice == max(.$choice), gsub(".*\\:", "", choice_text),
-                                           "---"))) %>%
-        ungroup %>%
-        select(choice, Total, group)
-      
-      # build/format GT table
-      tbl_data <- bind_rows(total_row, out %>%
-                              pivot_wider(id_cols = c(choice_text, target),
-                                          names_from = group, 
-                                          values_from = frac) %>% 
-                              group_by(choice_text) %>% 
-                              mutate(choice = row_number()) %>%
-                              group_by(choice) %>% 
-                              mutate(id = cumsum(!duplicated(choice_text)),
-                                     group = LETTERS[id]) %>% 
-                              mutate(choice_text = ifelse(choice == min(.$choice), gsub("\\:.*", "", choice_text),
-                                                          ifelse(choice == max(.$choice), gsub(".*\\:", "", choice_text),
-                                                                 "---"))) %>% 
-                              ungroup %>% 
-                              select(-c(target, id)) %>%
-                              left_join(total_frac, by = c("choice" = "choice",
-                                                           "group" = "group")) %>% 
-                              relocate(Total, .after = "choice_text")) %>% 
-        select(-choice) %>% 
-        mutate(id = row_number()) %>% 
-        rename(target = choice_text, 
-               target_group = group)
-      
-      # when passing Matrix/Bipolar need to separate 
     }
   } else if (target_qt == "RO") { 
     
+    tbl_data <- sig_test_ro(out, group_totals, conf_level, group_filter)
     # create totals
-    total_row <- out %>% 
-      ungroup() %>% 
-      distinct(group, total) %>% 
-      janitor::adorn_totals() %>%
-      pivot_wider(names_from = group, 
-                  values_from = total) %>% 
-      relocate(Total, .before = everything()) %>%
-      mutate(choice_text = "Total Count (Answering)",
-             target = "") %>%
-      relocate(target, .before = everything()) %>% 
-      relocate(choice_text, .before = everything())
+    # total_row <- out %>% 
+    #   ungroup() %>% 
+    #   distinct(group, total) %>% 
+    #   janitor::adorn_totals() %>%
+    #   pivot_wider(names_from = group, 
+    #               values_from = total) %>% 
+    #   relocate(Total, .before = everything()) %>%
+    #   mutate(choice_text = "Total Count (Answering)",
+    #          target = "") %>%
+    #   relocate(target, .before = everything()) %>% 
+    #   relocate(choice_text, .before = everything())
     
     # create total percentages
-    total_frac <- out %>% 
-      ungroup() %>% 
-      group_by(choice_text, target) %>% 
-      tally(n) %>% 
-      mutate(Total = n/total_row$Total)
+    # total_frac <- out %>% 
+    #   ungroup() %>% 
+    #   group_by(choice_text, target) %>% 
+    #   tally(n) %>% 
+    #   mutate(Total = n/total_row$Total)
     
     # build/format GT table
-    tbl_data <- bind_rows(total_row, out %>% 
-                            pivot_wider(id_cols = c(choice_text, target),
-                                        names_from = group,
-                                        values_from = frac) %>% 
-                            left_join(select(total_frac, -n)) %>%
-                            relocate(Total, .after = "target")) %>% 
-      mutate(id = row_number()) %>% # used to set rule for % formatting
-      rename(target = choice_text, 
-             target_group = target)
+    # tbl_data <- bind_rows(total_row, out %>% 
+    #                         pivot_wider(id_cols = c(choice_text, target),
+    #                                     names_from = group,
+    #                                     values_from = frac) %>% 
+    #                         left_join(select(total_frac, -n)) %>%
+    #                         relocate(Total, .after = "target")) %>% 
+    #   mutate(id = row_number()) %>% # used to set rule for % formatting
+    #   rename(target = choice_text, 
+    #          target_group = target)
     
   } else if (target_qt == "DD") {
     
@@ -476,6 +774,7 @@ build_crosstab <- function(group, target) {
   attr(tbl_data, "group_qt") <- attributes(tmp_responses[[1]])$question_type
   attr(tbl_data, "group_st") <- attributes(tmp_responses[[1]])$selector_type
   attr(tbl_data, "nsize") <- length(unique(merged[!is.na(merged$target),]$ResponseId))
+  attr(tbl_data, 'conf_level') <- scales::percent(as.numeric(conf_level), accuracy = 1)
   tbl_data
   
 }
