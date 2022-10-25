@@ -18,8 +18,10 @@ The app can currently process and visualize multiple choice, matrix,
 pick-group-rank, bipolar, rank order, slider, and drilldown question
 types.
 
+### Single Question Summary
+
 For many of the question types, plot colors can be changed via the
-`spectrumInput` widget from
+`colorSelectorInput` widget from
 [dreamRs/shinyWidgets](https://shinyapps.dreamrs.fr/shinyWidgets/).
 
 All plots can be downloaded and resized as necessary.
@@ -28,3 +30,12 @@ All question data is also rendered in a [gt](https://gt.rstudio.com/)
 table. Formatting of the table is dependent on question type and
 determined internally. Tables are downloaded via a screenshot using the
 [dreamRs/capture](https://github.com/dreamRs/capture) function.
+
+### Crosstabs
+
+Crosstabs have been added to the app. Currently all presentation of the
+data is in a gt table only. The **Group** variable is in the column
+while the **Target** variable is found in the rows. Group levels can be
+filtered out of the table. If the the Target question type is either
+Matrix, Rank Order, or Pick, Group, Rank then the Target groupings can
+also be filtered.
