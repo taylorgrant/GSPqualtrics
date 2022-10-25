@@ -273,6 +273,10 @@ group_filter <- function(group, target) {
     pull(group)
 }
 
+
+# significance testing by question type -----------------------------------
+
+# multiple choice
 sig_test_mc <- function(tbl, totals, conf_level, grp_filter) {
 
   # pull the grouping variable
@@ -360,6 +364,7 @@ sig_test_mc <- function(tbl, totals, conf_level, grp_filter) {
 
 }
 
+# matrix, PGR
 sig_test_matrix <- function(tbl, totals, conf_level, grp_filter) {
   
   # pull the grouping variable
@@ -452,6 +457,7 @@ sig_test_matrix <- function(tbl, totals, conf_level, grp_filter) {
   
 }
 
+# Bipolar matrix question
 sig_test_bipolar <- function(tbl, totals, conf_level, grp_filter) {
   
   # pull the grouping variable
@@ -566,6 +572,7 @@ sig_test_bipolar <- function(tbl, totals, conf_level, grp_filter) {
   
 }
 
+# rank order
 sig_test_ro <- function(tbl, totals, conf_level, grp_filter) {
   
   # pull the grouping variable
@@ -726,36 +733,6 @@ build_crosstab <- function(group, target, conf_level, group_filter) {
   } else if (target_qt == "RO") { 
     
     tbl_data <- sig_test_ro(out, group_totals, conf_level, group_filter)
-    # create totals
-    # total_row <- out %>% 
-    #   ungroup() %>% 
-    #   distinct(group, total) %>% 
-    #   janitor::adorn_totals() %>%
-    #   pivot_wider(names_from = group, 
-    #               values_from = total) %>% 
-    #   relocate(Total, .before = everything()) %>%
-    #   mutate(choice_text = "Total Count (Answering)",
-    #          target = "") %>%
-    #   relocate(target, .before = everything()) %>% 
-    #   relocate(choice_text, .before = everything())
-    
-    # create total percentages
-    # total_frac <- out %>% 
-    #   ungroup() %>% 
-    #   group_by(choice_text, target) %>% 
-    #   tally(n) %>% 
-    #   mutate(Total = n/total_row$Total)
-    
-    # build/format GT table
-    # tbl_data <- bind_rows(total_row, out %>% 
-    #                         pivot_wider(id_cols = c(choice_text, target),
-    #                                     names_from = group,
-    #                                     values_from = frac) %>% 
-    #                         left_join(select(total_frac, -n)) %>%
-    #                         relocate(Total, .after = "target")) %>% 
-    #   mutate(id = row_number()) %>% # used to set rule for % formatting
-    #   rename(target = choice_text, 
-    #          target_group = target)
     
   } else if (target_qt == "DD") {
     
@@ -767,6 +744,7 @@ build_crosstab <- function(group, target, conf_level, group_filter) {
       ungroup()
   }
   
+  # set attributes for further use
   attr(tbl_data, "target_qt") <- attributes(tmp_responses[[2]])$question_type
   attr(tbl_data, "target_st") <- attributes(tmp_responses[[2]])$selector_type
   attr(tbl_data, "target_qtext") <- attributes(tmp_responses[[2]])$question_text
@@ -778,11 +756,3 @@ build_crosstab <- function(group, target, conf_level, group_filter) {
   tbl_data
   
 }
-
-
-# for the RO - offer to flip groupings
-# for PGR - offer to flip groupings
-
-
-
-
