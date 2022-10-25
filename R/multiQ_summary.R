@@ -1,42 +1,5 @@
 # working through crosstabbing 
 
-# load packages
-<<<<<<< HEAD
-# pacman::p_load(tidyverse, here, janitor, glue, qsurvey, qualtRics, gt)
-# 
-# sids <- readRDS(here("data", "qualtrics_sids.rds"))
-# 
-# source(here("R", "helpers.R"))
-# 
-# # load Sep Omnibus to play with # 
-# load_survey(sid = sids$id[1])
-# # change to Aug Omnibus for RO question
-# load_survey(sid = sids$id[7])
-# # for PGR (multi group)
-# load_survey(sid = "SV_88kbX2XMoe4hPWS")
-# # PGR (no groups; default to matrix)
-# load_survey(sid = "SV_0eny0VJXqdF0biZ")
-# # DD 
-# load_survey(sid = "SV_dj3bL70Bhql9FAy")
-=======
-pacman::p_load(tidyverse, here, janitor, glue, qsurvey, qualtRics, gt)
-
-sids <- readRDS(here("data", "qualtrics_sids.rds"))
-
-source(here("R", "helpers.R"))
-
-# load Sep Omnibus to play with # 
-load_survey(sid = sids$id[1])
-# change to Aug Omnibus for RO & Slider question
-load_survey(sid = sids$id[7])
-# for PGR (multi group)
-load_survey(sid = "SV_88kbX2XMoe4hPWS")
-# PGR (no groups; default to matrix)
-load_survey(sid = "SV_0eny0VJXqdF0biZ")
-# DD 
-load_survey(sid = "SV_dj3bL70Bhql9FAy")
->>>>>>> 3f0e6cb8c24a849dffc19ff453089bc0948d0cb6
-
 # crosstabbing  -----------------------------------------------------------
 
 # pull in response data for each q and summarise
