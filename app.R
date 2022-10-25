@@ -87,8 +87,17 @@ sidebar <- dashboardSidebar(
                menuItem("Target Variables:",
                         uiOutput("targetBlock"),
                         uiOutput("targetVariable")),
-               menuItem("Group Filter", uiOutput("groupFilter")),
-               menuItem("Target Filter", uiOutput("targetFilter"))
+               menuItem("Group Filter", 
+                        uiOutput("groupFilter"),
+                        uiOutput("filterSubmit")),
+               menuItem("Target Filter", uiOutput("targetFilter")),
+               menuItem("Confidence Level:", 
+                        radioButtons("conf_level", 
+                                     label = "Select confidence:",
+                                     inline = TRUE,
+                                     choices = c("90%" = ".90", 
+                                                 "95%" = ".95"), 
+                                     selected = c("90%" = ".90")))
                ),
       "crosstab")
   )
@@ -363,16 +372,21 @@ server = function(input, output, session) {
     )
   })
   
-  # run summary and plot function 
+  # get groups for potential filter
+  filter_groups <- reactive({
+    group_filter(input$group_variable, input$target_variable)
+  })
+  
   crosstab_data <- reactive({
-    build_crosstab(input$group_variable, input$target_variable)
+    build_crosstab(input$group_variable, input$target_variable, input$conf_level, input$group_filter)
   })
   
   output$groupFilter <- renderUI({
     checkboxGroupInput("group_filter", "Select any variables you want to drop:",
-                choices = crosstab_data() %>% select(-c(target, id, target_group)) %>% names(),
+                choices = filter_groups()
     )
   })
+  
   
   output$targetFilter <- 
       renderUI({
@@ -384,14 +398,14 @@ server = function(input, output, session) {
 
   # take reactive GT and render it for use
   output$gt_crosstab <- render_gt(
-    multiQ_table(crosstab_data(), input$group_filter, input$target_filter)
+    multiQ_table(crosstab_data(), input$target_filter)
   )
   
   output$tab2 <- renderUI({
     tab2_ui <- tabItem("crosstab", h4("Crosstab Results"), value="test2",
                        fluidRow(
                          box(
-                           width = 6,
+                           width = 7,
                            validate(
                              need(input$target_variable != "", "Please select your Group and Target variables to crosstab...")
                            ),
