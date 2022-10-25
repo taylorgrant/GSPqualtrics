@@ -259,8 +259,9 @@ get_responses <- function(q) {
 }
 
 # function to pull responses, merge on responseID, and crosstab
-build_crosstab <- function(qs) {
+build_crosstab <- function(group, target) {
   
+  qs <- c(group, target)
   # pull responses
   tmp_responses <- map(qs, get_responses) %>% 
     set_names(qs)
@@ -477,9 +478,9 @@ build_crosstab <- function(qs) {
   attr(tbl_data, "group_qt") <- attributes(tmp_responses[[1]])$question_type
   attr(tbl_data, "group_st") <- attributes(tmp_responses[[1]])$selector_type
   attr(tbl_data, "nsize") <- length(unique(merged[!is.na(merged$target),]$ResponseId))
+  tbl_data
   
-  
-  multiQ_table(tbl_data)
+  # gt_crosstab <- multiQ_table(tbl_data)
 }
 
 
