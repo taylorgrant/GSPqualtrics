@@ -1,8 +1,15 @@
 # GT Table - Crosstab Data # 
 
-multiQ_table <- function(dat) {
+multiQ_table <- function(dat, group_filter, target_filter = NULL) {
   
-  dat %>% 
+  if (is.null(target_filter) == FALSE) {
+    dat <- dat %>% 
+      filter(!target_group %in% target_filter)
+  } else {
+    dat
+  }
+  
+  gt_crosstab <- dat %>% 
     gt(rowname_col = "target",
        groupname_col = "target_group") %>% 
   # style the table
@@ -79,7 +86,7 @@ multiQ_table <- function(dat) {
     ) %>%
     # hide id column
     cols_hide(
-      columns = "id"
+      columns = c("id", group_filter)
     ) %>%
     # format missing data
     sub_missing(
