@@ -1,6 +1,7 @@
 # dataViz Single Question Summary #
 
 singleQ_summary <- function(q, color, ordered) {
+  
   add_break <- function(x) gsub("(.{28,}?)\\s", "\\1\n", x)
   meta <- toc %>% filter(question_id == q)
   
@@ -209,6 +210,7 @@ singleQ_summary <- function(q, color, ordered) {
     
     tmp <- svy %>%
       dplyr::select(ResponseId, all_of(qpull$qname))
+    
     # get the respondent count answering the question
     resp_count <- sum((rowSums(is.na(tmp[2:ncol(tmp)])) == ncol(tmp[2:ncol(tmp)])) == "FALSE")
     
