@@ -78,7 +78,7 @@ singleQ_table <- function(dat, meta, nsize) {
       # rename columns if necessary
       cols_label(
         value = "Response", n = "Count",
-        frac = "Pct"
+        frac = "Percent"
       ) %>%
       # final options
       tab_options(
