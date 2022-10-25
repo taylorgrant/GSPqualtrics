@@ -9,7 +9,7 @@ source(here("R", "helpers.R"))
 
 # load Sep Omnibus to play with # 
 load_survey(sid = sids$id[1])
-# change to Aug Omnibus for RO question
+# change to Aug Omnibus for RO & Slider question
 load_survey(sid = sids$id[7])
 # for PGR (multi group)
 load_survey(sid = "SV_88kbX2XMoe4hPWS")
@@ -283,12 +283,24 @@ build_crosstab <- function(qs) {
   tmp_responses <- map(qs, get_responses) %>% 
     set_names(qs)
   
+  # merge together on ResponseId
   merged <- tmp_responses[[1]] %>% 
     left_join(tmp_responses[[2]], by = "ResponseId") %>% 
     rename(group = value.x, target = value.y)
     
-  # pulling question and selector type of target variable 
+  # pull question and selector type of target variable 
   target_qt <- attributes(tmp_responses[[2]])$question_type
+  target_st <- attributes(tmp_responses[[2]])$selector_type
+  
+  # run check on PGR groupings
+  if (target_qt == "PGR") {
+    grps <- nrow(data.table::rbindlist(d$questions[[qs[2]]]$groups) %>%
+                   as_tibble() %>% 
+                   rename(name = recode, choice_text = description))
+    if (grps <= 1) {
+      target_qt <- "RO"
+    }
+  }
   
   # this is the proper total for the group variable
   group_totals <- merged %>% 
@@ -305,6 +317,36 @@ build_crosstab <- function(qs) {
       left_join(group_totals) %>% 
       mutate(frac = n/total) %>%
       ungroup()
+    
+    # create totals
+    total_row <- out %>% 
+      ungroup() %>% 
+      distinct(group, total) %>% 
+      janitor::adorn_totals() %>%
+      pivot_wider(names_from = group, 
+                  values_from = total) %>% 
+      relocate(Total, .before = everything()) %>%
+      mutate(target = "Total Count (Answering)") %>%
+      relocate(target, .before = everything())
+    
+    # create total percentages
+    total_frac <- out %>% 
+      ungroup() %>% 
+      group_by(target) %>% 
+      tally(n) %>% 
+      mutate(Total = n/total_row$Total,
+             target = as.character(target))
+    
+    # reorganize for GT table
+    tbl_data <- bind_rows(total_row, out %>% 
+                            pivot_wider(id_cols = c(target), 
+                                        names_from = group, 
+                                        values_from = frac) %>%
+                            mutate(target = as.character(target)) %>%
+                            left_join(select(total_frac, -n)) %>% 
+                            relocate(Total, .after = "target")) %>% 
+      mutate(id = row_number(), # used to set rule for % formatting
+             target_group = ifelse(str_detect(target, "Total Count"), "", "Response"))
       
     } else if (target_qt %in% c("Matrix", "RO", "PGR")) {
     
@@ -315,10 +357,130 @@ build_crosstab <- function(qs) {
         mutate(frac = n/total) %>%
         ungroup()
       
+      if (target_st != "Bipolar") { 
+        
+        # create totals
+        total_row <- out %>% 
+          ungroup() %>% 
+          distinct(group, total) %>% 
+          janitor::adorn_totals() %>%
+          pivot_wider(names_from = group, 
+                      values_from = total) %>% 
+          relocate(Total, .before = everything()) %>%
+          mutate(target = "Total Count (Answering)",
+                 choice_text = "") %>%
+          relocate(target, .before = everything()) %>% 
+          relocate(choice_text, .before = everything())
+        
+        # create total percentages
+        total_frac <- out %>% 
+          ungroup() %>% 
+          group_by(choice_text, target) %>% 
+          tally(n) %>% 
+          mutate(Total = n/total_row$Total)
+        
+        # build/format GT table
+        tbl_data <- bind_rows(total_row, out %>% 
+                                pivot_wider(id_cols = c(choice_text, target),
+                                            names_from = group,
+                                            values_from = frac) %>% 
+                                left_join(select(total_frac, -n)) %>%
+                                relocate(Total, .after = "target")) %>% 
+          mutate(id = row_number())  %>% # used to set rule for % formatting
+          rename(target_group = choice_text) # rename for table template
+        
+      } else if (target_st == "Bipolar") {
+        
+        # create totals
+        total_row <- out %>% 
+          ungroup() %>% 
+          distinct(group, total) %>% 
+          janitor::adorn_totals() %>%
+          pivot_wider(names_from = group, 
+                      values_from = total) %>% 
+          relocate(Total, .before = everything()) %>%
+          mutate(choice_text = "Total Count (Answering)",
+                 group = "") %>%
+          relocate(choice_text, .before = everything())
+        
+        # create total percentages
+        total_frac <- out %>% 
+          ungroup() %>% 
+          group_by(choice_text, target) %>% 
+          tally(n) %>% 
+          mutate(Total = n/total_row$Total) %>% 
+          group_by(choice_text) %>% 
+          mutate(choice = row_number()) %>% 
+          group_by(choice) %>% 
+          mutate(id = cumsum(!duplicated(choice_text)),
+                 group = LETTERS[id]) %>% 
+          mutate(choice_text = ifelse(choice == min(.$choice), gsub("\\:.*", "", choice_text),
+                                      ifelse(choice == max(.$choice), gsub(".*\\:", "", choice_text),
+                                             "---"))) %>%
+          ungroup %>%
+          select(choice, Total, group)
+        
+        # build/format GT table
+        tbl_data <- bind_rows(total_row, out %>%
+                                pivot_wider(id_cols = c(choice_text, target),
+                                            names_from = group, 
+                                            values_from = frac) %>% 
+                                group_by(choice_text) %>% 
+                                mutate(choice = row_number()) %>%
+                                group_by(choice) %>% 
+                                mutate(id = cumsum(!duplicated(choice_text)),
+                                       group = LETTERS[id]) %>% 
+                                mutate(choice_text = ifelse(choice == min(.$choice), gsub("\\:.*", "", choice_text),
+                                                            ifelse(choice == max(.$choice), gsub(".*\\:", "", choice_text),
+                                                                   "---"))) %>% 
+                                ungroup %>% 
+                                select(-c(target, id)) %>%
+                                left_join(total_frac, by = c("choice" = "choice",
+                                                             "group" = "group")) %>% 
+                                relocate(Total, .after = "choice_text")) %>% 
+          select(-choice) %>% 
+          mutate(id = row_number()) %>% 
+          rename(target = choice_text, 
+                 target_group = group)
+      
       # when passing Matrix/Bipolar need to separate 
-    
-      } else if (target_qt == "DD") {
+      }
+      } else if (target_qt == "RO") { 
+        
+        # create totals
+        total_row <- out %>% 
+          ungroup() %>% 
+          distinct(group, total) %>% 
+          janitor::adorn_totals() %>%
+          pivot_wider(names_from = group, 
+                      values_from = total) %>% 
+          relocate(Total, .before = everything()) %>%
+          mutate(choice_text = "Total Count (Answering)",
+                 target = "") %>%
+          relocate(target, .before = everything()) %>% 
+          relocate(choice_text, .before = everything())
+        
+        # create total percentages
+        total_frac <- out %>% 
+          ungroup() %>% 
+          group_by(choice_text, target) %>% 
+          tally(n) %>% 
+          mutate(Total = n/total_row$Total)
+        
+        # build/format GT table
+        tbl_data <- bind_rows(total_row, out %>% 
+                                pivot_wider(id_cols = c(choice_text, target),
+                                            names_from = group,
+                                            values_from = frac) %>% 
+                                left_join(select(total_frac, -n)) %>%
+                                relocate(Total, .after = "target")) %>% 
+          mutate(id = row_number()) %>% # used to set rule for % formatting
+          rename(target = choice_text, 
+                 target_group = target)
+        
+        } else if (target_qt == "DD") {
           
+          # THE DD HASN'T BEEN FINISHED YET
         out <- merged %>% 
           count(choice_text, group) %>%
           left_join(group_totals) %>% 
@@ -326,43 +488,23 @@ build_crosstab <- function(qs) {
           ungroup()
       }
   
-  if (target_qt == "PGR") {
-    grps <- nrow(data.table::rbindlist(d$questions[[qs[2]]]$groups) %>%
-           as_tibble() %>% 
-           rename(name = recode, choice_text = description))
-    if (grps <= 1) {
-      attr(out, "target_qt") <- "RO"
-      attr(out, "target_st") <- attributes(tmp_responses[[2]])$selector_type
-      attr(out, "target_qtext") <- attributes(tmp_responses[[2]])$question_text
-      attr(out, "group_qtext") <- attributes(tmp_responses[[1]])$question_text
-      attr(out, "group_qt") <- attributes(tmp_responses[[1]])$question_type
-      attr(out, "group_st") <- attributes(tmp_responses[[1]])$selector_type
-      attr(out, "nsize") <- length(unique(merged[!is.na(merged$target),]$ResponseId))
-    } else {
-      attr(out, "target_qt") <- attributes(tmp_responses[[2]])$question_type
-      attr(out, "target_st") <- attributes(tmp_responses[[2]])$selector_type
-      attr(out, "target_qtext") <- attributes(tmp_responses[[2]])$question_text
-      attr(out, "group_qtext") <- attributes(tmp_responses[[1]])$question_text
-      attr(out, "group_qt") <- attributes(tmp_responses[[1]])$question_type
-      attr(out, "group_st") <- attributes(tmp_responses[[1]])$selector_type
-      attr(out, "nsize") <- length(unique(merged[!is.na(merged$target),]$ResponseId))
-    }
-  } else {
-    attr(out, "target_qt") <- attributes(tmp_responses[[2]])$question_type
-    attr(out, "target_st") <- attributes(tmp_responses[[2]])$selector_type
-    attr(out, "target_qtext") <- attributes(tmp_responses[[2]])$question_text
-    attr(out, "group_qtext") <- attributes(tmp_responses[[1]])$question_text
-    attr(out, "group_qt") <- attributes(tmp_responses[[1]])$question_type
-    attr(out, "group_st") <- attributes(tmp_responses[[1]])$selector_type
-    attr(out, "nsize") <- length(unique(merged[!is.na(merged$target),]$ResponseId))
-  }
-  out
+  attr(tbl_data, "target_qt") <- attributes(tmp_responses[[2]])$question_type
+  attr(tbl_data, "target_st") <- attributes(tmp_responses[[2]])$selector_type
+  attr(tbl_data, "target_qtext") <- attributes(tmp_responses[[2]])$question_text
+  attr(tbl_data, "group_qtext") <- attributes(tmp_responses[[1]])$question_text
+  attr(tbl_data, "group_qt") <- attributes(tmp_responses[[1]])$question_type
+  attr(tbl_data, "group_st") <- attributes(tmp_responses[[1]])$selector_type
+  attr(tbl_data, "nsize") <- length(unique(merged[!is.na(merged$target),]$ResponseId))
   
-  multiQ_table(out)
+  
+  multiQ_table(tbl_data)
 }
 
-qs <- c("QID2438", "QID165")
+qs <- c("QID2422b", "QID2425")
 build_crosstab(qs)
+
+# for the RO - offer to flip groupings
+# for PGR - offer to flip groupings
 
 
 
