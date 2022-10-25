@@ -8,13 +8,12 @@ pacman::p_load(tidyverse, janitor, here, glue, qsurvey, shiny,
 # load Qualtrics Survey IDs
 sids <- readRDS("/srv/shiny-server/qualtrics-viz/data/qualtrics_sids.rds")
 
-# colors 
+# colors for summary plots ------------------------------------------------ 
 library(scales)
 col2Hex <- function(col) {
   mat <- grDevices::col2rgb(col, alpha = TRUE)
   grDevices::rgb(mat[1, ]/255, mat[2, ]/255, mat[3,]/255)
 }
-
 
 choices_brewer <- list(
   "Xfinity" = c('#E6004D', '#E64F00', '#FFAA00', '#FFFFFF', '#ECECF3',
@@ -72,10 +71,7 @@ sidebar <- dashboardSidebar(
                           choices = choices_brewer,
                           mode = "radio",
                           display_label = TRUE
-                        )
-               )
-      ), 
-      "qualsurvey"
+                        ))), "qualsurvey"
     ),
     convertMenuItem(
       menuItem("Crosstab Summary", tabName = "crosstab",
@@ -98,8 +94,7 @@ sidebar <- dashboardSidebar(
                                      choices = c("90%" = ".90", 
                                                  "95%" = ".95"), 
                                      selected = c("90%" = ".90")))
-               ),
-      "crosstab")
+               ),"crosstab")
   )
 )
 
@@ -117,7 +112,7 @@ body <- dashboardBody(
   ),
   # tags$head(tags$link(rel = "shortcut icon", href = "favicon.ico")),
   tabItems(
-    # conditionally render the output using inputs (see renderUI below)
+    # conditionally render the output using inputs (server side)
     tabItem("qualsurvey", uiOutput("tab1"),
             shinysky::busyIndicator(text = 'Please wait...', wait = 1500)),
     tabItem("crosstab", uiOutput("tab2"),
@@ -125,10 +120,8 @@ body <- dashboardBody(
   )
 )
 
-
 # build the UI ------------------------------------------------------------
 ui = dashboardPage(header, sidebar, body, skin = "black")
-
 
 
 # server side -------------------------------------------------------------
@@ -147,6 +140,7 @@ server = function(input, output, session) {
     )
   })
   
+  # import button once survey is selected
   observeEvent(input$surveySelect, {
     output$importSurvey <- renderUI({
       if (input$surveySelect == '') return()
@@ -159,10 +153,13 @@ server = function(input, output, session) {
     })
   })
   
+  # import survey on butotn push and load topline metadata
   observeEvent(input$importSurvey, {
+    
     # load data here
     load_survey(sids[sids$name == input$surveySelect,]$id) # survey load on button push
-    # 
+    #
+    
     output$tab1 <- renderUI({
       tabItem("qualsurvey", h4("Imported Survey"), 
               fluidRow(
@@ -174,13 +171,13 @@ server = function(input, output, session) {
               ))
     })
     
-    # 4a. On load, pull in the survey blocks
+    # On load, pull in the survey blocks
     output$blockContents <- renderUI({
       selectInput("block_contents", "Survey Block",
                   choices = c(unique(toc$block), "RESET / ALL BLOCKS"))
     })
     
-    #   # 4b. On load, pull in the survey questionnaire
+    # On load, pull in the survey questionnaire
     output$tableContents <- renderUI({
       toc_list <- c("", toc$question_id)
       names(toc_list) <- c("", paste0("Q", toc$question_order, ": ", toc$question_text))
@@ -190,7 +187,7 @@ server = function(input, output, session) {
     })
   })
   
-  # 5. Allow the Survey Block selection to filter the questionnaire
+  # Allow the Survey Block selection to filter the questionnaire
   observeEvent(input$block_contents, {
     # call helper to filter questions as necessary
     updated_toc <- toc_filter(toc, input$block_contents)
@@ -213,6 +210,7 @@ server = function(input, output, session) {
     survey_data()$gt_tbl
   )
   
+  # render main dash for use upon selection of question from TOC
   observeEvent(input$table_contents, {
     output$tab1 <- renderUI({
       tab1_ui <- tabItem("qualsurvey", h4("Survey Results"), value="test1",
@@ -279,7 +277,7 @@ server = function(input, output, session) {
     })
   })
   
-  # download handler 
+  # download handler (plot1)
   output$downloadPlot1 <- downloadHandler(
     filename = function(){
       paste0(d$name, "-Q", toc[toc$question_id == input$table_contents,]$question_order, ".png")
@@ -294,6 +292,7 @@ server = function(input, output, session) {
     }
   )
   
+  # plot2
   output$downloadPlot2 <- downloadHandler(
     filename = function(){
       paste0(d$name, "-Q", toc[toc$question_id == input$table_contents,]$question_order, "-flip.png")
@@ -311,6 +310,7 @@ server = function(input, output, session) {
   
   # Tab 2 -------------------------------------------------------------------
   
+  # validation requiring both Group and Target selections
   output$tab2 <- renderUI({
     validate(
       need(input$target_variable != "", "Please select your Group and Target variables to crosstab...")
@@ -320,7 +320,8 @@ server = function(input, output, session) {
     )
   })
 
-  # -- GROUPING VARIABLES -- #
+
+# grouping variables ------------------------------------------------------
   output$groupBlock <- renderUI({
     selectInput("group_block", "Group Block",
                 choices = c(unique(toc$block), "RESET / ALL BLOCKS"))
@@ -335,6 +336,7 @@ server = function(input, output, session) {
   })
 
 
+  # not sure if this is doing anything 
   observeEvent(input$group_block, {
     # call helper to filter questions as necessary
     updated_toc <- group_toc_filter(toc, input$group_block)
@@ -346,7 +348,8 @@ server = function(input, output, session) {
     )
   })
 
-  # -- TARGET VARIABLES -- #
+
+# target variables --------------------------------------------------------
   output$targetBlock <- renderUI({
     selectInput("target_block", "Target Block",
                 choices = c(unique(toc$block), "RESET / ALL BLOCKS"))
@@ -360,7 +363,7 @@ server = function(input, output, session) {
                 choices = toc_list)
   })
 
-
+  # group selection updates target variables available
   observeEvent(input$target_block, {
     # call helper to filter questions as necessary
     updated_toc <- toc_filter(toc, input$target_block)
@@ -372,22 +375,24 @@ server = function(input, output, session) {
     )
   })
   
-  # get groups for potential filter
+  # Groups that can be filtered out of the data
   filter_groups <- reactive({
     group_filter(input$group_variable, input$target_variable)
   })
   
+  # main crosstab function; includes the significance testing within it
   crosstab_data <- reactive({
     build_crosstab(input$group_variable, input$target_variable, input$conf_level, input$group_filter)
   })
   
+  # to drop group variables from the table
   output$groupFilter <- renderUI({
     checkboxGroupInput("group_filter", "Select any variables you want to drop:",
                 choices = filter_groups()
     )
   })
   
-  
+  # to filter out specific questions/options in matrix questions (filtered via the GT table function)
   output$targetFilter <- 
       renderUI({
         if (attributes(crosstab_data())$target_qt %in% c("Matrix", "RO", "PGR")) {
@@ -396,11 +401,12 @@ server = function(input, output, session) {
         }
   })
 
-  # take reactive GT and render it for use
+  # take reactive GT and render it for use (target filter drops vars)
   output$gt_crosstab <- render_gt(
     multiQ_table(crosstab_data(), input$target_filter)
   )
   
+  # render dash; made page a little wider for some tables
   output$tab2 <- renderUI({
     tab2_ui <- tabItem("crosstab", h4("Crosstab Results"), value="test2",
                        fluidRow(
