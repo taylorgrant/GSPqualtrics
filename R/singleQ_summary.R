@@ -156,9 +156,7 @@ singleQ_summary <- function(q, color, ordered) {
     qchoice <- svy_choice %>%
       filter(question_id == q) %>%
       mutate(choice_text = add_break(choice_text)) %>% 
-      arrange(as.numeric(choice_recode)) %>% 
-      filter(!is.na(analyze)) %>% 
-      mutate(choice_text = factor(choice_text, levels = dput(qchoice$choice_text)))
+      arrange(as.numeric(choice_recode)) 
     
     tmp <- svy %>%
       dplyr::select(ResponseId, all_of(matrix_map$name))
