@@ -21,7 +21,7 @@ singleQ_plot <- function(dat, meta, nsize, color, ordered) {
 
   if (meta$question_type %in% c("MC", "TE_AGE", "Slider")) {
     # set up dataframe for plot
-    pdat <- dat %>%
+    pdat <- dat |>
       mutate(txtcol = ifelse(frac < .075, "black", "white"),
              v_just = ifelse(frac < .075, -0.2, 1.4),
              h_just = ifelse(frac < .075, -.1, 1.2),
@@ -90,7 +90,7 @@ singleQ_plot <- function(dat, meta, nsize, color, ordered) {
 
   } else if (meta$question_type == "RO") {
     
-    pdat <- dat %>%
+    pdat <- dat |>
       mutate(txtcol = ifelse(value <= 4, "white", "#5A6366"))
     
     # stacked vertical bar
@@ -157,10 +157,10 @@ singleQ_plot <- function(dat, meta, nsize, color, ordered) {
       pal <- pal_choice(dat)
     
       # add line breaks to statement and created grouped id for plot
-      pdat <- dat %>%
-        group_by(value) %>%
-        mutate(id = cumsum(!duplicated(statement_a))) %>%
-        group_by(id) %>%
+      pdat <- dat |>
+        group_by(value) |>
+        mutate(id = cumsum(!duplicated(statement_a))) |>
+        group_by(id) |>
         mutate(choice_count = row_number(),
                txtcol = ifelse(choice_count > 2, "white", "black"))
       
@@ -190,7 +190,7 @@ singleQ_plot <- function(dat, meta, nsize, color, ordered) {
       data_plot <- list(data = pdat, p1 = p1, gt_tbl = gt_tbl)
       
     } else { # if not bipolar
-      pdat <- dat %>%
+      pdat <- dat |>
         mutate(txtcol = "black",
                v_just = -0.2,
                h_just = -.05,
@@ -265,7 +265,7 @@ singleQ_plot <- function(dat, meta, nsize, color, ordered) {
     }
     } else if (meta$question_type == "PGR") {
     
-      pdat <- dat %>%
+      pdat <- dat |>
         mutate(txtcol = ifelse(frac < .075, "black", "white"),
                v_just = ifelse(frac < .075, -0.2, 1.4),
                h_just = ifelse(frac < .075, -.1, 1.2),
