@@ -29,6 +29,7 @@ load_survey <- function(sid) {
   cleanFun <- function(string) {
     return(gsub("<.*?>", "", string))
   }
+  
   # questions  
   svy_q <<- qsurvey::questions(design_object = d) |>  
     dplyr::mutate(question_text = cleanFun(question_text), # strip html tags
@@ -37,6 +38,7 @@ load_survey <- function(sid) {
                   question_text = stringr::str_replace_all(question_text, "&quot;", "'")) |>  
     dplyr::filter(question_type != "DB") |> 
     dplyr::as_tibble()
+  
   # get survey choices for each question
   svy_choice <<- qsurvey::choices(design_object = d) |> 
     dplyr::mutate(choice_text = cleanFun(choice_text), # strip html tags
@@ -105,6 +107,27 @@ toc_filter <- function(tbl, blck) {
 
   } else
     tmp <- tbl |>  
+      dplyr::mutate(newtoc = paste0("Q", question_order, ": ", question_text))  
+  # now grab newtoc and set names
+  tmptoc <- tmp$question_id |> 
+    purrr::set_names(nm = tmp$newtoc)
+}
+
+# filter down the TOC questions by Block; and allow for RESET
+group_toc_filter <- function(tbl, blck) {
+  
+  if (any(tbl$block == blck)) {
+    tmp <- tbl |> 
+      dplyr::filter(question_type %in% c("MC", "TE_AGE", "RO"))  |> 
+      dplyr::filter(block %in% blck)  |>  
+      dplyr::mutate(newtoc = paste0("Q", question_order, ": ", question_text))
+    # now grab newtoc and set names
+    tmptoc <- tmp$question_id |> 
+      purrr::set_names(nm = tmp$newtoc)
+    
+  } else
+    tmp <- tbl |>  
+      dplyr::filter(question_type %in% c("MC", "TE_AGE", "RO"))  |> 
       dplyr::mutate(newtoc = paste0("Q", question_order, ": ", question_text))  
   # now grab newtoc and set names
   tmptoc <- tmp$question_id |> 
