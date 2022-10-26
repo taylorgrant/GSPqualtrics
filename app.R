@@ -38,7 +38,12 @@ choices_brewer <- list(
 # dashboard contains 3 parts - header, sidebar, and body # 
 
 # header ------------------------------------------------------------------
-header <- dashboardHeader(title = "Qualtrics Visualizer")
+header <- dashboardHeader(title = "Qualtrics Visualizer",
+                          tags$li(a(href = 'https://goodbysilverstein.com/',
+                                    img(src = 'https://images.squarespace-cdn.com/content/v1/5ea9e40f1c49ae0355b4d859/1615824766494-NPIZRASFQS47W5GHS0UY/RepData_Goodby_Silverstein.png',
+                                        title = "GS&P", height = "30px"),
+                                    style = "padding-top:10px; padding-bottom:10px;"),
+                                  class = "dropdown"))
 
 
 # sidebar -----------------------------------------------------------------
