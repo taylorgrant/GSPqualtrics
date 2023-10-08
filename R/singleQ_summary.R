@@ -73,7 +73,7 @@ singleQ_summary <- function(q, color, ordered) {
     } else {
 
       tmp <- tmp %>%
-        mutate(yob = 2022 - value) %>%
+        mutate(yob = 2023 - value) %>%
         mutate (gen = case_when (yob < 2013 & yob > 1996 ~ 'Gen Z',
                                  yob < 1997 & yob > 1980 ~ 'Millennial',
                                  yob < 1981 & yob > 1964 ~ 'Gen X',
@@ -300,7 +300,7 @@ singleQ_summary <- function(q, color, ordered) {
       mutate(value = forcats::fct_reorder(value, frac, max)) %>%
       arrange(desc(frac))
   } else if (ordered == "Yes" & meta$question_type == "Matrix") {
-
+    # don't allow the Likert scales to reorder
     if (!meta$selector_type %in% c("Bipolar", "Likert")) {
 
       tmp <- tmp %>%
