@@ -1,42 +1,43 @@
 # dataViz Single Question Summary #
 
 singleQ_summary <- function(q, color, ordered) {
-  
+
   add_break <- function(x) gsub("(.{28,}?)\\s", "\\1\n", x)
   meta <- toc %>% filter(question_id == q)
-  
+
   if (meta$question_type == "MC") {
+
     # get question names to pull columns from survey
     qpull <- svy_q %>%
-      filter(question_id == q) %>% 
+      filter(question_id == q) %>%
       filter(!str_detect(export_name, "TEXT"))
     # get the possible options of the MC question
-    qchoice <- svy_choice %>% 
-      filter(question_id == q) %>% 
-      mutate(choice_text = add_break(choice_text)) %>% 
+    qchoice <- svy_choice %>%
+      filter(question_id == q) %>%
+      mutate(choice_text = add_break(choice_text)) %>%
       arrange(as.numeric(choice_recode))
-    
+
     # pull columns from survey data
-    tmp <- svy %>% 
+    tmp <- svy %>%
       dplyr::select(ResponseId, all_of(qpull$export_name))
     # get the respondent count answering the question
     resp_count <- sum((rowSums(is.na(tmp[2:ncol(tmp)])) == ncol(tmp[2:ncol(tmp)])) == "FALSE")
-    
+
     # summarize (order by factor)
     tmp <- tmp %>%
-      pivot_longer(-ResponseId) %>% 
+      pivot_longer(-ResponseId) %>%
       dplyr::filter(!str_detect(name, "TEXT"),
                     !is.na(value)) %>%
       dplyr::mutate(value = add_break(value)) %>%
       mutate(value = factor(value, levels = dput(qchoice$choice_text))) %>%
       count(value) %>%
       mutate(frac = n/resp_count)
-    
+
   } else if (meta$question_type == "TE_AGE") {
-    
+
     qpull <- svy_q %>%
       filter(question_id == str_replace_all(q, "a|b", ""))
-    
+
     # pull columns from survey data
     tmp <- svy %>%
       dplyr::select(ResponseId, all_of(qpull$export_name))
@@ -50,8 +51,9 @@ singleQ_summary <- function(q, color, ordered) {
       count(value) %>%
       mutate(value = as.numeric(value)) %>%
       mutate(frac = n/resp_count)
-    
+
     if (meta$question_text == "Respondent breakdown by age cohort") {
+      print("line 56")
       tmp <- tmp %>%
         mutate(group = case_when(value <= 24 ~ "18-24",
                                  value > 24 & value <= 34 ~ "25-34",
@@ -66,9 +68,10 @@ singleQ_summary <- function(q, color, ordered) {
                                                 "45-54", "55-64", "65+"))) %>%
         rename(value = group) %>%
         arrange(value)
-      
+
       out <- singleQ_plot(tmp, meta, resp_count, color)
     } else {
+
       tmp <- tmp %>%
         mutate(yob = 2022 - value) %>%
         mutate (gen = case_when (yob < 2013 & yob > 1996 ~ 'Gen Z',
@@ -86,11 +89,11 @@ singleQ_summary <- function(q, color, ordered) {
         rename(value = gen) %>%
         arrange(value)
     }
-    
+
     } else if (meta$question_type == "RO") {
-    
+
       add_break <- function(x) gsub("(.{21,}?)\\s", "\\1\n", x)
-      
+
       # get question names to pull columns from survey
       qpull <- svy_q %>%
         filter(question_id == q) %>%
@@ -99,7 +102,7 @@ singleQ_summary <- function(q, color, ordered) {
       qchoice <- svy_choice %>%
         filter(question_id == q) %>%
         mutate(choice_text = add_break(choice_text))
-      
+
       # pull columns from survey data
       tmp <- svy %>%
         dplyr::select(ResponseId, all_of(qpull$export_name))
@@ -117,9 +120,9 @@ singleQ_summary <- function(q, color, ordered) {
         count(choice_text, value) %>%
         group_by(choice_text) %>%
         mutate(frac = n/resp_count)
-      
+
   } else if (meta$question_type == "Slider") {
-  
+
     add_break <- function(x) gsub("(.{21,}?)\\s", "\\1\n", x)
     # get question names to pull columns from survey
     qpull <- svy_q %>%
@@ -128,7 +131,7 @@ singleQ_summary <- function(q, color, ordered) {
     # get the possible options of the MC question
     qchoice <- svy_choice %>%
       filter(question_id == q)
-    
+
     # pull columns from survey data
     tmp <- svy %>%
       dplyr::select(ResponseId, all_of(qpull$export_name))
@@ -141,34 +144,34 @@ singleQ_summary <- function(q, color, ordered) {
                     !is.na(value)) %>%
       count(value) %>%
       mutate(frac = n/resp_count)
-    
+
   } else if (meta$question_type == "Matrix") {
-    
+
     add_break <- function(x) gsub("(.{28,}?)\\s", "\\1\n", x)
-    
+
     # pull colmap
     matrix_map <- colmap %>%
       filter(str_detect(ImportId, glue::glue("{q}_"))) %>%
       select(name = qname, ImportId, choice_text = sub) %>%
       mutate(choice_text = trimws(gsub("\\ - .*", "", choice_text)))
-    
+
     # pull matrix options for factor order
     qchoice <- svy_choice %>%
       filter(question_id == q) %>%
-      mutate(choice_text = add_break(choice_text)) %>% 
-      arrange(as.numeric(choice_recode)) 
-    
+      mutate(choice_text = add_break(choice_text)) %>%
+      arrange(as.numeric(choice_recode))
+
     tmp <- svy %>%
       dplyr::select(ResponseId, all_of(matrix_map$name))
-    
+
     # get the respondent count answering the question
     resp_count <- sum((rowSums(is.na(tmp[2:ncol(tmp)])) == ncol(tmp[2:ncol(tmp)])) == "FALSE")
-    
+
     # for bipolar comparing two statements
     if (meta$selector_type == "Bipolar") {
-      
+
       add_statement_break <- function(x) gsub("(.{20,}?)\\s", "\\1\n", x)
-      
+
       tmp <- tmp %>%
         pivot_longer(-ResponseId) %>%
         dplyr::filter(!str_detect(name, "TEXT"),
@@ -183,8 +186,9 @@ singleQ_summary <- function(q, color, ordered) {
                  into = c("statement_a", "statement_b"), sep = ":") %>%
         mutate(statement_a = add_statement_break(statement_a),
                statement_b = add_statement_break(statement_b))
-      
+
     } else {
+
       # summarize
       tmp <- tmp %>%
         pivot_longer(-ResponseId) %>%
@@ -197,28 +201,28 @@ singleQ_summary <- function(q, color, ordered) {
                value = factor(value, levels = dput(qchoice$choice_text))) %>%
         count(choice_text, value) %>%
         group_by(choice_text) %>%
-        mutate(frac = n/resp_count) %>% 
+        mutate(frac = n/resp_count) %>%
         group_by(choice_text)
     }
-    
+
   } else if (meta$question_type == "PGR") {
-    
+
     qpull <- colmap %>%
       filter(str_detect(ImportId, glue::glue("{q}_")))
-    
+
     add_break <- function(x) gsub("(.{15,}?)\\s", "\\1\n", x)
-    
+
     tmp <- svy %>%
       dplyr::select(ResponseId, all_of(qpull$qname))
-    
+
     # get the respondent count answering the question
     resp_count <- sum((rowSums(is.na(tmp[2:ncol(tmp)])) == ncol(tmp[2:ncol(tmp)])) == "FALSE")
-    
+
     # extract groupings from the question
     grps <- data.table::rbindlist(d$questions[[q]]$groups) %>%
       as_tibble() %>%
       rename(name = recode, choice_text = description)
-    
+
     if (nrow(grps) <= 1) {
       merge_and_group <- function(dat) {
         grp <- dat %>%
@@ -238,10 +242,10 @@ singleQ_summary <- function(q, color, ordered) {
         mutate(frac = n/resp_count,
                choice_text = add_break(choice_text),
                value = factor(value))
-      
+
       # convert question type to send to matrix plot
       meta$question_type <- "Matrix"
-      
+
     } else {
       tmp <- tmp %>%
         pivot_longer(-ResponseId,
@@ -259,27 +263,27 @@ singleQ_summary <- function(q, color, ordered) {
         group_by(choice_text) %>%
         arrange(desc(frac), .by_group = TRUE)
     }
-    
+
     } else if (meta$question_type == "DD") {
       # pull colmap
       drill_map <- colmap %>%
         filter(str_detect(ImportId, glue::glue("{q}_"))) %>%
         select(key = qname, ImportId, choice_text = sub) %>%
         mutate(choice_text = trimws(gsub("\\ - .*", "", choice_text)))
-      
+
       drill_name <- drill_map %>%
         summarise(nm = paste(choice_text, collapse = " - ")) %>%
         pull()
       # pull matrix options for factor order
       qchoice <- svy_choice %>%
         filter(question_id == q)
-      
+
       tmp <- svy %>%
         dplyr::select(ResponseId, all_of(drill_map$key))
-      
+
       # get the respondent count answering the question
       resp_count <- sum((rowSums(is.na(tmp[2:ncol(tmp)])) == ncol(tmp[2:ncol(tmp)])) == "FALSE")
-      
+
       # summarize
       tmp <- tmp %>%
         unite(choice_text, sep = " - ", !ResponseId) %>%
@@ -287,23 +291,25 @@ singleQ_summary <- function(q, color, ordered) {
         mutate(frac = n/resp_count) %>%
         arrange(desc(frac))
     }
-  
+
   if (ordered == "No") {
     tmp
   } else if (ordered == "Yes" & meta$question_type %in% c("MC", "TE_AGE")) {
-    tmp <- tmp %>% 
-      mutate(value = forcats::fct_reorder(value, frac, max)) %>% 
+    print("line 298")
+    tmp <- tmp %>%
+      mutate(value = forcats::fct_reorder(value, frac, max)) %>%
       arrange(desc(frac))
   } else if (ordered == "Yes" & meta$question_type == "Matrix") {
-    
-    if (meta$selector_type != "Bipolar") {
-      tmp <- tmp %>% 
-        group_by(choice_text) %>% 
-        mutate(value = forcats::fct_reorder(value, frac, max)) %>% 
+
+    if (!meta$selector_type %in% c("Bipolar", "Likert")) {
+
+      tmp <- tmp %>%
+        group_by(choice_text) %>%
+        mutate(value = forcats::fct_reorder(value, frac, max)) %>%
         arrange(desc(frac), .by_group = TRUE)
-    } 
+    }
   }
   out <- singleQ_plot(tmp, meta, resp_count, color, ordered)
-  
+
 }
 
